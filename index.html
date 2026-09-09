@@ -318,6 +318,8 @@
     <div style="display:flex;align-items:center;gap:14px;">
       <span class="sync-status" id="syncStatus"></span>
       <button class="btn-primary" onclick="openModal()">+ Nowe zlecenie</button>
+      <button class="logout-btn" onclick="document.getElementById('importFile').click()">Importuj dane</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none;" onchange="handleImportFile(this.files[0])">
       <button class="logout-btn" onclick="doLogout()">Wyloguj</button>
     </div>
   </header>
@@ -567,6 +569,43 @@ document.getElementById('loginForm').addEventListener('submit', function(e){
     errEl.style.display = 'block';
   });
 });
+
+function handleImportFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    let data;
+    try{
+      data = JSON.parse(e.target.result);
+    }catch(err){
+      alert('Nie udało się odczytać pliku - upewnij się, że to plik wyeksportowany ze starej wersji apki.');
+      return;
+    }
+    const importedOrders = Array.isArray(data.orders) ? data.orders : [];
+    const importedContacts = data.contacts || { klienci:{}, drukarnie:{} };
+
+    const existingIds = new Set(orders.map(o=>o.id));
+    let added = 0;
+    importedOrders.forEach(o=>{
+      if(!existingIds.has(o.id)){
+        orders.push(o);
+        existingIds.add(o.id);
+        added++;
+      }
+    });
+
+    contacts.klienci = Object.assign({}, contacts.klienci, importedContacts.klienci || {});
+    contacts.drukarnie = Object.assign({}, contacts.drukarnie, importedContacts.drukarnie || {});
+
+    save();
+    saveContacts();
+    render();
+    renderDatalists();
+    alert(`Zaimportowano ${added} zleceń (pominięto ${importedOrders.length - added} już istniejących).`);
+    document.getElementById('importFile').value = '';
+  };
+  reader.readAsText(file);
+}
 
 function doLogout(){
   if(confirm('Wylogować się z tego urządzenia?')){
