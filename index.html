@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zlecenia poligraficzne</title>
+<style>
+  :root{
+    --paper:#F7F5EF;
+    --paper-2:#EFEBE0;
+    --ink:#1C1B19;
+    --ink-soft:#6B675C;
+    --line:#DBD5C4;
+    --navy:#1F3A52;
+    --navy-2:#2C4E6B;
+    --red:#C1432A;
+    --red-bg:#F7E3DD;
+    --green:#3F7D53;
+    --green-bg:#E1EEE3;
+    --amber:#B4791A;
+    --amber-bg:#F5E7D0;
+    --font-display: 'Iowan Old Style','Palatino Linotype', Georgia, 'Times New Roman', serif;
+    --font-body: -apple-system, BlinkMacSystemFont,'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: 'SF Mono','Roboto Mono', Consolas, 'Courier New', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--font-body);
+    line-height:1.45;
+    min-height:100vh;
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:32px 24px 80px;}
+
+  /* --- header --- */
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:16px;margin-bottom:28px;padding-bottom:20px;
+    border-bottom:2px solid var(--ink);
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .regmark{width:30px;height:30px;flex:none;}
+  h1{
+    font-family:var(--font-display);
+    font-size:26px;font-weight:700;margin:0;letter-spacing:0.2px;
+  }
+  .brand small{display:block;font-family:var(--font-mono);font-size:11px;color:var(--ink-soft);letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+  button{font-family:var(--font-body);cursor:pointer;border:none;}
+  .btn-primary{
+    background:var(--navy);color:#fff;padding:11px 18px;border-radius:3px;
+    font-size:14px;font-weight:600;letter-spacing:.2px;
+  }
+  .btn-primary:hover{background:var(--navy-2);}
+
+  /* --- reminders --- */
+  #reminders{margin-bottom:26px;display:none;flex-direction:column;gap:8px;}
+  .reminder{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:12px 14px;border-radius:3px;font-size:14px;
+    border-left:4px solid var(--red);
+    background:var(--red-bg);color:#5a2115;
+  }
+  .reminder.amber{border-left-color:var(--amber);background:var(--amber-bg);color:#5c3d0d;}
+  .reminder b{font-weight:700;}
+  .reminder span:not(.tag){flex:1;min-width:180px;}
+  .reminder .tag{
+    font-family:var(--font-mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;
+    padding:2px 6px;border:1px solid currentColor;border-radius:2px;opacity:.75;
+  }
+  .reminder-action{
+    flex:none;font-size:12px;font-weight:600;padding:5px 10px;border-radius:3px;
+    border:1px solid currentColor;color:inherit;text-decoration:none;white-space:nowrap;
+  }
+  .reminder-action:hover{background:rgba(0,0,0,.08);}
+
+  .reminders-head{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:0 2px 2px;
+  }
+  .reminders-count{font-family:var(--font-mono);font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.5px;}
+  .dismiss-all{
+    background:transparent;border:none;color:var(--ink-soft);font-size:12px;
+    text-decoration:underline;padding:2px 4px;
+  }
+  .dismiss-all:hover{color:var(--ink);}
+  .reminder-close{
+    flex:none;background:transparent;border:none;color:inherit;opacity:.5;
+    font-size:13px;line-height:1;padding:2px 4px;border-radius:2px;
+  }
+  .reminder-close:hover{opacity:1;background:rgba(0,0,0,.08);}
+
+  /* --- toolbar --- */
+  .toolbar{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;}
+  .toolbar input[type=text]{
+    flex:1;min-width:180px;padding:10px 12px;border:1px solid var(--line);
+    border-radius:3px;background:#fff;font-size:14px;font-family:var(--font-body);
+  }
+  .toolbar select{
+    padding:10px 12px;border:1px solid var(--line);border-radius:3px;background:#fff;
+    font-size:13px;font-family:var(--font-body);color:var(--ink);
+  }
+  .count{font-family:var(--font-mono);font-size:12px;color:var(--ink-soft);}
+  .toggle-closed{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft);cursor:pointer;user-select:none;}
+  .toggle-closed input{width:auto;}
+
+  /* --- prowizja panel --- */
+  .commission{
+    background:#fff;border:1px solid var(--line);border-radius:4px;
+    padding:18px 20px;margin-bottom:24px;
+  }
+  .commission-head{
+    display:flex;justify-content:space-between;align-items:center;cursor:pointer;
+    gap:12px;
+  }
+  .commission-head h3{font-family:var(--font-display);font-size:16px;margin:0;}
+  .commission-head .caret{color:var(--ink-soft);font-size:12px;transition:transform .15s;}
+  .commission-head .caret.open{transform:rotate(90deg);}
+  .commission-top{display:flex;gap:28px;flex-wrap:wrap;margin-top:2px;}
+  .commission-top .stat{}
+  .commission-top .m-label{font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);display:block;margin-bottom:2px;}
+  .commission-top .m-value{font-size:17px;font-weight:700;}
+  .commission-body{
+    display:none;margin-top:16px;padding-top:14px;border-top:1px dashed var(--line);
+  }
+  .commission-body.open{display:block;}
+  .commission-row{
+    display:flex;justify-content:space-between;padding:6px 0;font-size:13px;
+    border-bottom:1px solid var(--paper-2);
+  }
+  .commission-row.total{font-weight:700;border-bottom:none;border-top:1px solid var(--line);margin-top:4px;padding-top:10px;}
+  .commission-row .lbl{color:var(--ink-soft);}
+  .commission-note{font-size:11px;color:var(--ink-soft);margin-top:12px;font-family:var(--font-mono);line-height:1.5;}
+
+  /* --- grupy miesięczne --- */
+  .month-group{margin-bottom:34px;}
+  .month-group:last-child{margin-bottom:0;}
+  .month-header{
+    display:flex;align-items:baseline;gap:10px;margin-bottom:14px;
+    padding-bottom:8px;border-bottom:1px solid var(--ink);
+  }
+  .month-header h2{font-family:var(--font-display);font-size:18px;margin:0;text-transform:capitalize;}
+  .month-header .month-count{font-family:var(--font-mono);font-size:12px;color:var(--ink-soft);}
+  .month-group .commission{margin-bottom:16px;}
+  .month-group .list-cards{display:flex;flex-direction:column;gap:14px;}
+
+  /* --- cards --- */
+  #list{display:flex;flex-direction:column;gap:14px;}
+  .card{
+    position:relative;background:#fff;border:1px solid var(--line);border-radius:4px;
+    padding:18px 20px;
+  }
+  .card.closed{background:var(--paper-2);opacity:.72;}
+  .card.closed .card-title{text-decoration:line-through;text-decoration-color:var(--ink-soft);}
+  .badge.invoice-todo{background:var(--amber-bg);color:#6a4610;}
+  .quick-check{
+    display:inline-flex;align-items:center;gap:6px;font-size:12px;
+    padding:5px 9px;border-radius:3px;border:1px solid var(--line);
+    color:var(--ink-soft);cursor:pointer;user-select:none;background:#fff;
+  }
+  .quick-check input{width:auto;margin:0;cursor:pointer;}
+  .quick-check.active{background:var(--amber-bg);color:#6a4610;border-color:transparent;font-weight:600;}
+  .quick-check.closed-check.active{background:var(--ink);color:#fff;}
+  .crop{position:absolute;width:9px;height:9px;border-color:var(--ink-soft);opacity:.35;}
+  .crop.tl{top:-1px;left:-1px;border-top:1px solid;border-left:1px solid;}
+  .crop.tr{top:-1px;right:-1px;border-top:1px solid;border-right:1px solid;}
+  .crop.bl{bottom:-1px;left:-1px;border-bottom:1px solid;border-left:1px solid;}
+  .crop.br{bottom:-1px;right:-1px;border-bottom:1px solid;border-right:1px solid;}
+
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;}
+  .card-title{font-family:var(--font-display);font-size:19px;font-weight:700;margin:0;}
+  .card-client{font-size:13px;color:var(--ink-soft);margin-top:2px;}
+  .card-actions{display:flex;gap:6px;flex:none;}
+  .icon-btn{
+    background:transparent;border:1px solid var(--line);border-radius:3px;
+    width:30px;height:30px;font-size:14px;color:var(--ink-soft);
+  }
+  .icon-btn:hover{border-color:var(--navy);color:var(--navy);}
+
+  .badges{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;}
+  .badge{
+    font-size:12px;padding:5px 9px;border-radius:3px;background:var(--paper-2);
+    color:var(--ink-soft);display:flex;align-items:center;gap:5px;font-family:var(--font-mono);
+  }
+  .badge b{font-family:var(--font-body);color:var(--ink);font-weight:600;}
+  .badge.status-oczekujące{background:var(--amber-bg);color:#6a4610;}
+  .badge.status-otrzymane{background:#E1EAF2;color:#1f4266;}
+  .badge.status-zaakceptowane{background:var(--green-bg);color:#215432;}
+  .badge.status-wysłane_do_drukarni{background:#E5E0F0;color:#3b2e63;}
+  .badge.overdue{background:var(--red-bg);color:#7a2415;}
+  .badge.soon{background:var(--amber-bg);color:#6a4610;}
+  .badge.paid{background:var(--green-bg);color:#215432;}
+
+  .card-meta{display:flex;gap:22px;flex-wrap:wrap;font-size:13px;margin-top:8px;}
+  .m-label{color:var(--ink-soft);font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-family:var(--font-mono);display:block;margin-bottom:2px;}
+  .card-meta .m-label{color:var(--ink-soft);font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-family:var(--font-mono);display:block;margin-bottom:2px;}
+  .card-meta .m-value{font-weight:600;}
+
+  .mail-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px dashed var(--line);}
+  .mail-btn{
+    display:inline-flex;align-items:center;gap:5px;font-size:12px;font-family:var(--font-body);
+    padding:7px 11px;border-radius:3px;border:1px solid var(--navy);color:var(--navy);
+    text-decoration:none;background:#fff;transition:background .1s;
+  }
+  .mail-btn:hover{background:var(--navy);color:#fff;}
+  .mail-btn.disabled{
+    border-color:var(--line);color:var(--ink-soft);cursor:not-allowed;opacity:.6;
+  }
+  .margin-pos{color:var(--green);}
+  .margin-neg{color:var(--red);}
+
+  .card-notes{
+    margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);
+    font-size:13px;color:var(--ink-soft);white-space:pre-wrap;
+  }
+  .empty{
+    text-align:center;padding:60px 20px;color:var(--ink-soft);
+    border:1px dashed var(--line);border-radius:4px;
+  }
+  .empty .regmark{width:36px;height:36px;margin:0 auto 14px;opacity:.4;}
+
+  /* --- modal --- */
+  .overlay{
+    display:none;position:fixed;inset:0;background:rgba(28,27,25,.45);
+    align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:50;
+  }
+  .overlay.open{display:flex;}
+  .modal{
+    background:var(--paper);border-radius:5px;max-width:640px;width:100%;
+    padding:28px 28px 24px;border:1px solid var(--line);
+  }
+  .modal h2{font-family:var(--font-display);font-size:21px;margin:0 0 18px;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .form-grid .full{grid-column:1/-1;}
+  label{display:block;font-size:12px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);margin-bottom:5px;}
+  input,textarea,select{
+    width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:3px;
+    font-family:var(--font-body);font-size:14px;background:#fff;color:var(--ink);
+  }
+  textarea{resize:vertical;min-height:56px;}
+  .check-row{display:flex;align-items:center;gap:8px;margin-top:6px;}
+  .check-row input{width:auto;}
+  .check-row label{margin:0;text-transform:none;font-family:var(--font-body);font-size:13px;letter-spacing:0;color:var(--ink);}
+  .modal-actions{display:flex;justify-content:space-between;align-items:center;margin-top:22px;}
+  .btn-ghost{background:transparent;color:var(--ink-soft);padding:10px 14px;font-size:13px;}
+  .btn-ghost:hover{color:var(--red);}
+  .btn-cancel{background:transparent;color:var(--ink-soft);padding:10px 16px;font-size:14px;border:1px solid var(--line);border-radius:3px;margin-right:8px;}
+
+  footer{text-align:center;margin-top:50px;font-size:11px;color:var(--ink-soft);font-family:var(--font-mono);}
+
+  /* --- ekran logowania --- */
+  #loginScreen{
+    position:fixed;inset:0;background:var(--paper);z-index:100;
+    display:flex;align-items:center;justify-content:center;padding:20px;
+  }
+  #loginScreen.hidden{display:none;}
+  .login-box{
+    max-width:340px;width:100%;background:#fff;border:1px solid var(--line);
+    border-radius:5px;padding:32px 28px;
+  }
+  .login-box h1{font-family:var(--font-display);font-size:22px;margin:0 0 4px;}
+  .login-box p{font-size:13px;color:var(--ink-soft);margin:0 0 20px;}
+  .login-box label{display:block;font-size:12px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);margin:14px 0 5px;}
+  .login-box input{width:100%;padding:10px;border:1px solid var(--line);border-radius:3px;font-size:14px;}
+  .login-box button{width:100%;margin-top:20px;padding:11px;background:var(--navy);color:#fff;border-radius:3px;font-size:14px;font-weight:600;}
+  .login-box button:hover{background:var(--navy-2);}
+  #loginError{color:var(--red);font-size:13px;margin-top:12px;display:none;}
+  #loginStatus{color:var(--ink-soft);font-size:12px;margin-top:10px;text-align:center;}
+  #appRoot{display:none;}
+  #appRoot.ready{display:block;}
+  .logout-btn{background:transparent;border:none;color:var(--ink-soft);font-size:12px;text-decoration:underline;cursor:pointer;}
+  .sync-status{font-family:var(--font-mono);font-size:10px;color:var(--ink-soft);}
+</style>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1F3A52">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Zlecenia">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-box">
+    <h1>Zlecenia poligraficzne</h1>
+    <p>Zaloguj się, żeby zobaczyć swoje dane — te same na telefonie i komputerze.</p>
+    <form id="loginForm">
+      <label>E-mail</label>
+      <input type="email" id="login-email" required autocomplete="username">
+      <label>Hasło</label>
+      <input type="password" id="login-password" required autocomplete="current-password">
+      <button type="submit">Zaloguj</button>
+    </form>
+    <div id="loginError"></div>
+    <div id="loginStatus">Łączenie…</div>
+  </div>
+</div>
+
+<div id="appRoot">
+<div class="wrap">
+
+  <header>
+
+    <div class="brand">
+      <svg class="regmark" viewBox="0 0 40 40"><circle cx="20" cy="20" r="12" fill="none" stroke="var(--navy)" stroke-width="1.6"/><line x1="20" y1="2" x2="20" y2="38" stroke="var(--navy)" stroke-width="1.6"/><line x1="2" y1="20" x2="38" y2="20" stroke="var(--navy)" stroke-width="1.6"/></svg>
+      <div>
+        <h1>Zlecenia poligraficzne</h1>
+        <small id="todayLabel">—</small>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <span class="sync-status" id="syncStatus"></span>
+      <button class="btn-primary" onclick="openModal()">+ Nowe zlecenie</button>
+      <button class="logout-btn" onclick="doLogout()">Wyloguj</button>
+    </div>
+  </header>
+
+  <div id="reminders"></div>
+
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="Szukaj po tytule lub kliencie…" oninput="render()">
+    <select id="sortSel" onchange="render()">
+      <option value="priority">Sortuj: najpilniejsze</option>
+      <option value="newest">Sortuj: najnowsze</option>
+      <option value="client">Sortuj: klient A–Z</option>
+      <option value="title">Sortuj: tytuł A–Z</option>
+    </select>
+    <label class="toggle-closed">
+      <input type="checkbox" id="showClosed" onchange="render()">
+      Pokaż zamknięte
+    </label>
+    <span class="count" id="countLabel"></span>
+  </div>
+
+  <div id="list"></div>
+
+  <footer>Dane są zapisywane w Twojej prywatnej bazie w chmurze i synchronizują się między telefonem a komputerem. Dostęp do nich ma tylko zalogowane konto.</footer>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">Nowe zlecenie</h2>
+    <form id="orderForm">
+      <input type="hidden" id="f-id">
+      <div class="form-grid">
+        <div class="full">
+          <label>Tytuł zlecenia</label>
+          <input type="text" id="f-tytul" required placeholder="np. Ulotki A5 – wiosenna promocja">
+        </div>
+        <div class="full">
+          <label>Klient</label>
+          <input type="text" id="f-klient" required list="klienciDatalist" placeholder="np. Firma XYZ Sp. z o.o.">
+          <datalist id="klienciDatalist"></datalist>
+        </div>
+        <div class="full">
+          <label>E-mail klienta</label>
+          <input type="email" id="f-emailKlienta" placeholder="np. biuro@klient.pl">
+        </div>
+        <div class="full">
+          <label>Parametry druku</label>
+          <textarea id="f-parametry" placeholder="np. A5, 4+4, kreda 170g, nakład 1000 szt., folia mat"></textarea>
+        </div>
+        <div class="full">
+          <label>Numer ISBN/ISSN</label>
+          <input type="text" id="f-isbnIssn" placeholder="np. 978-83-XXXXX-XX-X">
+        </div>
+
+        <div>
+          <label>Data przekazania plików (od klienta)</label>
+          <input type="date" id="f-dataPrzekazania">
+        </div>
+        <div>
+          <label>Status plików</label>
+          <select id="f-statusPlikow">
+            <option value="oczekujące">Oczekuję na pliki</option>
+            <option value="otrzymane">Otrzymane, nie zaakceptowane</option>
+            <option value="zaakceptowane">Zaakceptowane</option>
+            <option value="wysłane_do_drukarni">Wysłane do drukarni</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Nazwa drukarni</label>
+          <input type="text" id="f-drukarnia" list="drukarnieDatalist" placeholder="np. Drukarnia Kowalski">
+          <datalist id="drukarnieDatalist"></datalist>
+        </div>
+        <div>
+          <label>E-mail drukarni</label>
+          <input type="email" id="f-emailDrukarni" placeholder="np. zamowienia@drukarnia.pl">
+        </div>
+        <div>
+          <label>Data wysyłki z drukarni</label>
+          <input type="date" id="f-dataWysylki">
+        </div>
+        <div></div>
+
+        <div class="full">
+          <label>Adres dostawy</label>
+          <textarea id="f-adresDostawy" placeholder="np. Jan Kowalski, ul. Przykładowa 12/3, 50-001 Wrocław"></textarea>
+        </div>
+
+        <div>
+          <label>Firma kurierska</label>
+          <input type="text" id="f-kurier" placeholder="np. DPD, InPost, DHL">
+        </div>
+        <div>
+          <label>Nr listu przewozowego / link do śledzenia</label>
+          <input type="text" id="f-listPrzewozowy" placeholder="np. numer paczki lub link tracking">
+        </div>
+
+        <div>
+          <label>Cena z drukarni (netto)</label>
+          <input type="number" step="0.01" id="f-cenaDrukarnia" placeholder="0.00">
+        </div>
+        <div>
+          <label>Cena dla klienta (netto)</label>
+          <input type="number" step="0.01" id="f-cenaKlient" placeholder="0.00">
+        </div>
+
+        <div>
+          <label>Cena netto (do zamówienia/faktury)</label>
+          <input type="number" step="0.01" id="f-cenaNettoZam" placeholder="0.00">
+        </div>
+        <div>
+          <label>VAT (%)</label>
+          <input type="number" step="0.01" id="f-vatProcent" placeholder="np. 23" value="23">
+        </div>
+
+        <div>
+          <label>Numer faktury</label>
+          <input type="text" id="f-faktura" placeholder="np. FV/2026/08/12">
+        </div>
+        <div>
+          <label>Termin płatności</label>
+          <input type="date" id="f-terminPlatnosci">
+        </div>
+        <div>
+          <label>Termin płatności klienta (dni robocze)</label>
+          <input type="number" step="1" id="f-terminPlatnosciDniKlient" placeholder="np. 14">
+        </div>
+        <div>
+          <label>Termin płatności drukarni (dni robocze)</label>
+          <input type="number" step="1" id="f-terminPlatnosciDniDrukarnia" placeholder="np. 7">
+        </div>
+        <div></div>
+
+        <div class="full check-row">
+          <input type="checkbox" id="f-wystawFakture">
+          <label for="f-wystawFakture">Wystaw fakturę (jeszcze nie wystawiona)</label>
+        </div>
+
+        <div class="full check-row">
+          <input type="checkbox" id="f-zaplacona">
+          <label for="f-zaplacona">Faktura opłacona</label>
+        </div>
+
+        <div class="full check-row">
+          <input type="checkbox" id="f-zamkniete">
+          <label for="f-zamkniete">Zlecenie zamknięte</label>
+        </div>
+
+        <div class="full">
+          <label>Uwagi / zmiany</label>
+          <textarea id="f-uwagi" placeholder="np. klient prosił o zmianę koloru tła na 12.08"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <div>
+          <button type="button" class="btn-ghost" id="deleteBtn" onclick="deleteCurrent()" style="display:none;">Usuń zlecenie</button>
+          <button type="button" class="btn-cancel" id="duplicateBtn" onclick="duplicateCurrent()" style="display:none;">Kopiuj jako nowe</button>
+        </div>
+        <div>
+          <button type="button" class="btn-cancel" onclick="closeModal()">Anuluj</button>
+          <button type="submit" class="btn-primary">Zapisz</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+</div>
+
+<script>
+const DISMISSED_KEY = 'zlecenia_dismissed_v1'; // to zostaje lokalnie na urządzeniu (nie musi się synchronizować)
+let orders = [];
+let editingId = null;
+let contacts = { klienci:{}, drukarnie:{} };
+let lastReminderIds = [];
+
+// ====== KONFIGURACJA FIREBASE ======
+// Wklej tu config ze swojego projektu Firebase (Ustawienia projektu -> Twoje aplikacje -> SDK setup and configuration)
+const firebaseConfig = {
+  apiKey: "AIzaSyDbtM1iwelqACMHA0F3oz70AQfwkNrxdfs",
+  authDomain: "zlecenia-poligraficzne.firebaseapp.com",
+  projectId: "zlecenia-poligraficzne",
+  storageBucket: "zlecenia-poligraficzne.firebasestorage.app",
+  messagingSenderId: "866100448863",
+  appId: "1:866100448863:web:a0f774adcfa9d6ae1cd5ea"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+db.enablePersistence({synchronizeTabs:true}).catch(()=>{ /* offline cache niedostępny w tej przeglądarce - trudno, apka i tak działa online */ });
+
+let currentUser = null;
+let stateDocRef = null;
+let unsubscribeSnapshot = null;
+
+function setSyncStatus(text){
+  const el = document.getElementById('syncStatus');
+  if(el) el.textContent = text;
+}
+
+function showApp(){
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('appRoot').classList.add('ready');
+}
+function showLogin(msg){
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('appRoot').classList.remove('ready');
+  document.getElementById('loginStatus').textContent = msg || '';
+}
+
+auth.onAuthStateChanged(function(user){
+  if(unsubscribeSnapshot){ unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+  if(user){
+    currentUser = user;
+    stateDocRef = db.collection('users').doc(user.uid).collection('app').doc('state');
+    showApp();
+    setSyncStatus('Synchronizowanie…');
+    unsubscribeSnapshot = stateDocRef.onSnapshot(function(snap){
+      const data = snap.data() || {};
+      orders = data.orders || [];
+      contacts = data.contacts || { klienci:{}, drukarnie:{} };
+      if(!contacts.klienci) contacts.klienci = {};
+      if(!contacts.drukarnie) contacts.drukarnie = {};
+      render();
+      renderDatalists();
+      const now = new Date();
+      setSyncStatus('Zsynchronizowano ' + now.toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'}));
+    }, function(err){
+      setSyncStatus('Błąd synchronizacji');
+      console.error(err);
+    });
+  } else {
+    currentUser = null;
+    stateDocRef = null;
+    showLogin();
+  }
+});
+
+document.getElementById('loginForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('loginError');
+  errEl.style.display = 'none';
+  auth.signInWithEmailAndPassword(email, password).catch(function(err){
+    errEl.textContent = 'Nie udało się zalogować: ' + (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' ? 'błędny e-mail lub hasło.' : err.message);
+    errEl.style.display = 'block';
+  });
+});
+
+function doLogout(){
+  if(confirm('Wylogować się z tego urządzenia?')){
+    auth.signOut();
+  }
+}
+
+function load(){ /* dane wczytuje onSnapshot po zalogowaniu - nic tu nie trzeba robić */ }
+function save(){
+  if(!stateDocRef) return;
+  setSyncStatus('Zapisywanie…');
+  stateDocRef.set({ orders }, { merge: true }).catch(function(err){
+    setSyncStatus('Błąd zapisu');
+    console.error(err);
+  });
+}
+
+function loadContacts(){ /* dane wczytuje onSnapshot po zalogowaniu - nic tu nie trzeba robić */ }
+function saveContacts(){
+  if(!stateDocRef) return;
+  stateDocRef.set({ contacts }, { merge: true }).catch(function(err){
+    setSyncStatus('Błąd zapisu');
+    console.error(err);
+  });
+}
+function contactKey(name){ return (name||'').trim().toLowerCase(); }
+function rememberContact(map, name, email){
+  const key = contactKey(name);
+  if(!key || !email) return;
+  map[key] = { name: name.trim(), email: email.trim() };
+}
+function lookupContactEmail(map, name){
+  const c = map[contactKey(name)];
+  return c ? c.email : '';
+}
+function renderDatalists(){
+  const klienciList = Object.values(contacts.klienci).sort((a,b)=>a.name.localeCompare(b.name,'pl'));
+  const drukarnieList = Object.values(contacts.drukarnie).sort((a,b)=>a.name.localeCompare(b.name,'pl'));
+  document.getElementById('klienciDatalist').innerHTML = klienciList.map(c=>`<option value="${esc(c.name)}">`).join('');
+  document.getElementById('drukarnieDatalist').innerHTML = drukarnieList.map(c=>`<option value="${esc(c.name)}">`).join('');
+}
+function autofillEmail(nameVal, emailInputId, map){
+  const known = lookupContactEmail(map, nameVal);
+  const emailInput = document.getElementById(emailInputId);
+  if(known && !emailInput.value.trim()){
+    emailInput.value = known;
+  }
+}
+
+function toISODate(d){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function todayISO(){ return toISODate(new Date()); }
+function daysDiff(dateStr){
+  if(!dateStr) return null;
+  const d = new Date(dateStr+'T00:00:00');
+  const t = new Date(todayISO()+'T00:00:00');
+  return Math.round((d-t)/86400000);
+}
+function fmtDate(dateStr){
+  if(!dateStr) return '—';
+  const d = new Date(dateStr+'T00:00:00');
+  return d.toLocaleDateString('pl-PL', {day:'2-digit', month:'2-digit', year:'numeric'});
+}
+function fmtMoney(v){
+  if(v===undefined || v===null || v==='') return '—';
+  return Number(v).toLocaleString('pl-PL',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' zł';
+}
+
+function setTodayLabel(){
+  const d = new Date();
+  document.getElementById('todayLabel').textContent = d.toLocaleDateString('pl-PL', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+}
+
+function getDismissedToday(){
+  try{
+    const raw = localStorage.getItem(DISMISSED_KEY);
+    const data = raw ? JSON.parse(raw) : null;
+    if(!data || data.date !== todayISO()) return [];
+    return data.ids || [];
+  }catch(e){ return []; }
+}
+function saveDismissedToday(ids){
+  localStorage.setItem(DISMISSED_KEY, JSON.stringify({ date: todayISO(), ids }));
+}
+function dismissReminder(id){
+  const current = getDismissedToday();
+  if(!current.includes(id)) current.push(id);
+  saveDismissedToday(current);
+  buildReminders();
+}
+function dismissAllReminders(){
+  const current = getDismissedToday();
+  lastReminderIds.forEach(id=>{ if(!current.includes(id)) current.push(id); });
+  saveDismissedToday(current);
+  buildReminders();
+}
+
+function buildReminders(){
+  const box = document.getElementById('reminders');
+  const items = [];
+  const dismissed = getDismissedToday();
+
+  orders.forEach(o=>{
+    if(o.zamkniete) return;
+    // pliki od klienta - dziś
+    const dP = daysDiff(o.dataPrzekazania);
+    if(o.dataPrzekazania && !filesResolved(o)){
+      if(dP === 0){
+        items.push({id:`files-${o.id}`, level:'red', tag:'Ważne', text:`Dziś powinieneś otrzymać pliki od klienta — <b>${esc(o.tytul)}</b> (${esc(o.klient)})`});
+      } else if(dP !== null && dP < 0){
+        items.push({id:`files-${o.id}`, level:'red', tag:'Ważne', text:`Zaległość: pliki od klienta miały wpłynąć ${fmtDate(o.dataPrzekazania)} — <b>${esc(o.tytul)}</b> (${esc(o.klient)})`});
+      }
+    }
+    // wysyłka z drukarni - od 4 dni przed do dnia wysyłki
+    const dW = daysDiff(o.dataWysylki);
+    const shipWindow = (o.dataWysylki && dW !== null && dW >= 0 && dW <= 4);
+    if(shipWindow){
+      const gdy = dW === 0 ? 'dziś' : (dW === 1 ? 'jutro' : `za ${dW} dni`);
+      const tag = dW === 0 ? 'Dziś' : (dW === 1 ? 'Jutro' : `Za ${dW} dni`);
+      items.push({id:`ship-${o.id}`, level:'amber', tag, text:`Planowana wysyłka z drukarni ${gdy} (${fmtDate(o.dataWysylki)}) — <b>${esc(o.tytul)}</b> (${esc(o.klient)})`});
+    }
+    // 4 dni przed wysyłką (lub mniej) - zapytaj drukarnię, czy termin nadal aktualny
+    if(shipWindow){
+      const tag = dW === 0 ? 'Dziś' : (dW === 1 ? 'Jutro' : `Za ${dW} dni`);
+      const confirmText = `Zapytaj drukarnię, czy termin nadania druku jest nadal aktualny — <b>${esc(o.tytul)}</b> (${esc(o.klient)})`;
+      if(o.emailDrukarni){
+        items.push({id:`confirm-${o.id}`, level:'amber', tag, text:confirmText, actionUrl: mailZapytanieTermin(o), actionLabel:'Zapytaj drukarnię'});
+      } else {
+        items.push({id:`confirm-${o.id}`, level:'amber', tag, text:confirmText + ' (uzupełnij e-mail drukarni, żeby wysłać zapytanie jednym kliknięciem)'});
+      }
+    }
+    // faktura do wystawienia
+    let invoiceReminderAdded = false;
+    if(o.wystawFakture && !o.faktura){
+      items.push({id:`invoice-${o.id}`, level:'amber', tag:'Ważne', text:`Trzeba wystawić fakturę — <b>${esc(o.tytul)}</b> (${esc(o.klient)})`});
+      invoiceReminderAdded = true;
+    }
+    // druk wysłany do klienta, a faktura jeszcze nie wystawiona
+    if(!invoiceReminderAdded && !o.faktura && o.dataWysylki && dW !== null && dW <= 0){
+      items.push({id:`invoice-${o.id}`, level:'amber', tag:'Ważne', text:`Zamówienie zostało wysłane do klienta (${fmtDate(o.dataWysylki)}) — czas wystawić fakturę — <b>${esc(o.tytul)}</b> (${esc(o.klient)})`});
+    }
+    // termin płatności
+    const dT = daysDiff(o.terminPlatnosci);
+    if(o.terminPlatnosci && !o.zaplacona){
+      if(dT === 0){
+        items.push({id:`payment-${o.id}`, level:'red', tag:'Ważne', text:`Dziś mija termin płatności faktury ${o.faktura ? esc(o.faktura) : ''} — <b>${esc(o.klient)}</b> (${esc(o.tytul)})`});
+      } else if(dT !== null && dT < 0){
+        items.push({id:`payment-${o.id}`, level:'red', tag:'Ważne', text:`Zaległa płatność, termin minął ${fmtDate(o.terminPlatnosci)} — <b>${esc(o.klient)}</b> (${esc(o.tytul)})`});
+      }
+    }
+  });
+
+  const visibleItems = items.filter(i => !dismissed.includes(i.id));
+  lastReminderIds = visibleItems.map(i=>i.id);
+
+  if(visibleItems.length === 0){
+    box.style.display = 'none';
+    box.innerHTML = '';
+    return;
+  }
+  box.style.display = 'flex';
+  box.innerHTML = `
+    <div class="reminders-head">
+      <span class="reminders-count">${visibleItems.length} ${visibleItems.length===1?'powiadomienie':'powiadomień'} na dziś</span>
+      <button type="button" class="dismiss-all" onclick="dismissAllReminders()">Zamknij wszystkie</button>
+    </div>
+  ` + visibleItems.map(i=>`
+    <div class="reminder ${i.level==='amber'?'amber':''}">
+      <span class="tag">${i.tag}</span>
+      <span>${i.text}</span>
+      ${i.actionUrl ? `<a class="reminder-action" href="${esc(i.actionUrl)}">${esc(i.actionLabel||'Otwórz')}</a>` : ''}
+      <button type="button" class="reminder-close" title="Zamknij to powiadomienie (do jutra)" onclick="dismissReminder('${i.id}')">✕</button>
+    </div>`).join('');
+}
+
+function esc(s){
+  if(s===undefined||s===null) return '';
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function isUrl(s){
+  return /^https?:\/\//i.test((s||'').trim());
+}
+
+function filesResolved(o){
+  return o.statusPlikow === 'zaakceptowane' || o.statusPlikow === 'wysłane_do_drukarni';
+}
+
+function priorityDate(o){
+  const dates = [];
+  if(o.dataPrzekazania && !filesResolved(o)) dates.push(o.dataPrzekazania);
+  if(o.dataWysylki) dates.push(o.dataWysylki);
+  if(o.terminPlatnosci && !o.zaplacona) dates.push(o.terminPlatnosci);
+  if(dates.length===0) return '9999-99-99';
+  return dates.sort()[0];
+}
+
+function round2(x){ return Math.round((x + Number.EPSILON) * 100) / 100; }
+
+function calcWynagrodzenie(brutto){
+  const emerytalne = round2(brutto * 0.0976);
+  const rentowe = round2(brutto * 0.015);
+  const chorobowe = round2(brutto * 0.0245);
+  const spoleczne = round2(emerytalne + rentowe + chorobowe);
+  const podstawaZdrowotne = round2(brutto - spoleczne);
+  const zdrowotne = round2(podstawaZdrowotne * 0.09);
+  const kup = 250;
+  const kwotaZmniejszajaca = 300;
+  let podstawaOpodatkowania = Math.round(podstawaZdrowotne - kup);
+  if(podstawaOpodatkowania < 0) podstawaOpodatkowania = 0;
+  let podatek = podstawaOpodatkowania * 0.12 - kwotaZmniejszajaca;
+  if(podatek < 0) podatek = 0;
+  const zaliczkaPIT = Math.round(podatek);
+  const netto = round2(brutto - spoleczne - zdrowotne - zaliczkaPIT);
+  return { brutto, emerytalne, rentowe, chorobowe, zdrowotne, zaliczkaPIT, netto };
+}
+
+const openPanels = new Set();
+
+function toggleCommission(key){
+  const body = document.getElementById('commissionBody-'+key);
+  const caret = document.getElementById('commissionCaret-'+key);
+  if(!body) return;
+  const isOpen = body.classList.toggle('open');
+  caret.classList.toggle('open', isOpen);
+  if(isOpen) openPanels.add(key); else openPanels.delete(key);
+}
+
+function monthKeyOf(dateStr){
+  return dateStr ? dateStr.slice(0,7) : 'brak-daty';
+}
+function monthLabel(key){
+  if(key === 'brak-daty') return 'Bez ustalonej daty dostawy';
+  const [y,m] = key.split('-').map(Number);
+  const d = new Date(y, m-1, 1);
+  const label = d.toLocaleDateString('pl-PL', {month:'long', year:'numeric'});
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+function safeKey(key){ return key.replace(/[^a-z0-9]/gi,'_'); }
+
+function commissionPanelHTML(key, groupOrders){
+  const sk = safeKey(key);
+  const totalMargin = groupOrders.reduce((sum, o)=>{
+    if(o.cenaKlient!=='' && o.cenaDrukarnia!=='' && o.cenaKlient!=null && o.cenaDrukarnia!=null){
+      return sum + (Number(o.cenaKlient) - Number(o.cenaDrukarnia));
+    }
+    return sum;
+  }, 0);
+  const prowizja = round2(Math.max(totalMargin,0) * 0.25);
+  const w = calcWynagrodzenie(prowizja);
+  const isOpen = openPanels.has(sk);
+
+  return `
+  <div class="commission">
+    <div class="commission-head" onclick="toggleCommission('${sk}')">
+      <div>
+        <h3>Prowizja od marży</h3>
+        <div class="commission-top">
+          <div class="stat"><span class="m-label">Łączna marża</span><span class="m-value">${fmtMoney(round2(totalMargin))}</span></div>
+          <div class="stat"><span class="m-label">Prowizja (25%) — brutto</span><span class="m-value">${fmtMoney(prowizja)}</span></div>
+          <div class="stat"><span class="m-label">Do wypłaty — netto</span><span class="m-value">${fmtMoney(w.netto)}</span></div>
+        </div>
+      </div>
+      <span class="caret${isOpen?' open':''}" id="commissionCaret-${sk}">▶</span>
+    </div>
+    <div class="commission-body${isOpen?' open':''}" id="commissionBody-${sk}">
+      <div class="commission-row"><span class="lbl">Kwota brutto (prowizja)</span><span>${fmtMoney(w.brutto)}</span></div>
+      <div class="commission-row"><span class="lbl">Ubezpieczenie emerytalne (9,76%)</span><span>${fmtMoney(w.emerytalne)}</span></div>
+      <div class="commission-row"><span class="lbl">Ubezpieczenie rentowe (1,5%)</span><span>${fmtMoney(w.rentowe)}</span></div>
+      <div class="commission-row"><span class="lbl">Ubezpieczenie chorobowe (2,45%)</span><span>${fmtMoney(w.chorobowe)}</span></div>
+      <div class="commission-row"><span class="lbl">Ubezpieczenie zdrowotne (9%)</span><span>${fmtMoney(w.zdrowotne)}</span></div>
+      <div class="commission-row"><span class="lbl">Zaliczka na PIT</span><span>${fmtMoney(w.zaliczkaPIT)}</span></div>
+      <div class="commission-row total"><span class="lbl">Kwota netto</span><span>${fmtMoney(w.netto)}</span></div>
+      <div class="commission-note">
+        Wyliczenie wg standardowych zasad umowy o pracę: koszty uzyskania przychodu 250 zł, miesięczna kwota zmniejszająca podatek 300 zł (PIT-2), jeden etat, próg podatkowy 12%. Jeśli Twoja sytuacja jest inna, rzeczywista kwota netto może się różnić.
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleZamkniete(id, checked){
+  const o = orders.find(x=>x.id===id);
+  if(!o) return;
+  o.zamkniete = checked;
+  save();
+  render();
+}
+
+function toggleWystawFakture(id, checked){
+  const o = orders.find(x=>x.id===id);
+  if(!o) return;
+  o.wystawFakture = checked;
+  save();
+  render();
+}
+
+function mailtoUrl(email, subject, body){
+  return `mailto:${(email||'').trim()}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function bruttoZam(o){
+  if(o.cenaNettoZam==='' || o.cenaNettoZam==null || o.vatProcent==='' || o.vatProcent==null) return null;
+  return round2(Number(o.cenaNettoZam) * (1 + Number(o.vatProcent)/100));
+}
+
+function cenaVatLines(o){
+  const brutto = bruttoZam(o);
+  let lines = '';
+  if(o.cenaNettoZam!=='' && o.cenaNettoZam!=null){
+    lines += `Cena netto: ${fmtMoney(o.cenaNettoZam)}\n`;
+    lines += `VAT: ${o.vatProcent!=='' && o.vatProcent!=null ? o.vatProcent+'%' : '—'}\n`;
+    lines += `Cena brutto: ${brutto!==null ? fmtMoney(brutto) : '—'}\n`;
+  }
+  return lines;
+}
+
+function mailPotwierdzenieKlient(o){
+  const subject = `Potwierdzenie przyjęcia zamówienia – ${o.tytul}`;
+  const margin = (o.cenaKlient!=='' && o.cenaKlient!=null);
+  const body =
+`Dzień dobry,
+
+potwierdzam otrzymanie zamówienia „${o.tytul}”.
+
+Parametry druku: ${o.parametry || '—'}
+${o.isbnIssn ? `Numer ISBN/ISSN: ${o.isbnIssn}\n` : ''}${cenaVatLines(o)}Kwota zamówienia: ${margin ? fmtMoney(o.cenaKlient) : '—'}
+Termin przekazania plików: ${fmtDate(o.dataPrzekazania)}
+Planowany termin wysyłki: ${fmtDate(o.dataWysylki)}
+Termin płatności: ${o.terminPlatnosciDniKlient ? o.terminPlatnosciDniKlient+' dni roboczych' : (o.terminPlatnosci ? fmtDate(o.terminPlatnosci) : '—')}
+
+Pozdrawiam`;
+  return mailtoUrl(o.emailKlienta, subject, body);
+}
+
+function mailPotwierdzenieDrukarnia(o){
+  const subject = `Zlecenie do realizacji – ${o.tytul}`;
+  const priceSet = (o.cenaDrukarnia!=='' && o.cenaDrukarnia!=null);
+  const body =
+`Dzień dobry,
+
+przekazuję zlecenie do realizacji:
+
+Tytuł: ${o.tytul}
+Parametry druku: ${o.parametry || '—'}
+${o.isbnIssn ? `Numer ISBN/ISSN: ${o.isbnIssn}\n` : ''}Adres dostawy: ${o.adresDostawy || '—'}
+Ustalona kwota: ${priceSet ? fmtMoney(o.cenaDrukarnia) : '—'}
+Termin przekazania plików: ${fmtDate(o.dataPrzekazania)}
+Oczekiwany termin wysyłki: ${fmtDate(o.dataWysylki)}
+Termin płatności: ${o.terminPlatnosciDniDrukarnia ? o.terminPlatnosciDniDrukarnia+' dni roboczych' : '—'}
+
+Proszę o potwierdzenie przyjęcia zlecenia i przewidywanej daty wysyłki.
+
+Pozdrawiam`;
+  return mailtoUrl(o.emailDrukarni, subject, body);
+}
+
+function mailTracking(o){
+  const subject = `Twoje zamówienie zostało wysłane – ${o.tytul}`;
+  const body =
+`Dzień dobry,
+
+informuję, że zamówienie „${o.tytul}” zostało wysłane.
+
+Data wysyłki: ${fmtDate(o.dataWysylki)}
+Kurier: ${o.kurier || '—'}
+Numer / link do śledzenia przesyłki: ${o.listPrzewozowy || '—'}
+
+Pozdrawiam`;
+  return mailtoUrl(o.emailKlienta, subject, body);
+}
+
+function mailZapytanieTermin(o){
+  const subject = `Zapytanie o termin realizacji – ${o.tytul}`;
+  const body =
+`Dzień dobry,
+
+chciałbym się upewnić, czy zaplanowany termin nadania zamówienia „${o.tytul}” (${fmtDate(o.dataWysylki)}) jest nadal aktualny.
+
+Proszę o potwierdzenie lub informację, jeśli termin się zmienił.
+
+Pozdrawiam`;
+  return mailtoUrl(o.emailDrukarni, subject, body);
+}
+
+function renderCard(o){
+  const dP = daysDiff(o.dataPrzekazania);
+  const dW = daysDiff(o.dataWysylki);
+  const dT = daysDiff(o.terminPlatnosci);
+
+  const filesClass = 'status-'+(o.statusPlikow||'oczekujące');
+  let filesExtra = '';
+  if(!filesResolved(o) && dP !== null){
+    if(dP < 0) filesExtra = ' overdue';
+    else if(dP === 0) filesExtra = ' soon';
+  }
+
+  let shipExtra = '';
+  if(dW !== null && dW <= 2 && dW >= 0) shipExtra = ' soon';
+  if(dW !== null && dW < 0) shipExtra = ' overdue';
+
+  let payClass = o.zaplacona ? ' paid' : '';
+  if(!o.zaplacona && dT !== null){
+    if(dT < 0) payClass = ' overdue';
+    else if(dT === 0) payClass = ' soon';
+  }
+
+  const margin = (o.cenaKlient!=='' && o.cenaDrukarnia!=='' && o.cenaKlient!=null && o.cenaDrukarnia!=null)
+    ? (Number(o.cenaKlient) - Number(o.cenaDrukarnia)) : null;
+
+  return `
+  <div class="card${o.zamkniete ? ' closed' : ''}">
+    <div class="crop tl"></div><div class="crop tr"></div><div class="crop bl"></div><div class="crop br"></div>
+    <div class="card-top">
+      <div>
+        <p class="card-title">${esc(o.tytul)}</p>
+        <div class="card-client">${esc(o.klient)}</div>
+      </div>
+      <div class="card-actions">
+        <label class="quick-check${o.zamkniete ? ' active closed-check' : ''}" onclick="event.stopPropagation();">
+          <input type="checkbox" ${o.zamkniete ? 'checked' : ''} onchange="toggleZamkniete('${o.id}', this.checked)">
+          Zamknięte
+        </label>
+        <button class="icon-btn" title="Edytuj" onclick="openModal('${o.id}')">✎</button>
+      </div>
+    </div>
+
+    ${o.parametry ? `<div style="font-size:13px;color:var(--ink-soft);">${esc(o.parametry)}</div>` : ''}
+
+    <div class="badges">
+      <span class="badge ${filesClass}${filesExtra}">📄 Pliki: <b>${o.statusPlikow||'oczekujące'}</b>${o.dataPrzekazania ? ' · '+fmtDate(o.dataPrzekazania):''}</span>
+      <span class="badge${shipExtra}">🚚 ${o.drukarnia ? esc(o.drukarnia)+' · ' : ''}Wysyłka: <b>${fmtDate(o.dataWysylki)}</b></span>
+      ${(o.kurier || o.listPrzewozowy) ? `<span class="badge">📦 ${o.kurier ? esc(o.kurier)+' · ' : ''}${o.listPrzewozowy ? (isUrl(o.listPrzewozowy) ? `<a href="${esc(o.listPrzewozowy)}" target="_blank" rel="noopener" style="color:inherit;">Śledź przesyłkę</a>` : `<b>${esc(o.listPrzewozowy)}</b>`) : 'brak nr listu'}</span>` : ''}
+      <span class="badge${payClass}">🧾 Płatność: <b>${fmtDate(o.terminPlatnosci)}</b>${o.zaplacona?' · opłacona':''}</span>
+      <label class="quick-check${o.wystawFakture ? ' active' : ''}" onclick="event.stopPropagation();">
+        <input type="checkbox" ${o.wystawFakture ? 'checked' : ''} onchange="toggleWystawFakture('${o.id}', this.checked)">
+        Wystaw fakturę
+      </label>
+    </div>
+
+    <div class="card-meta">
+      <div><span class="m-label">Cena z drukarni</span><span class="m-value">${fmtMoney(o.cenaDrukarnia)}</span></div>
+      <div><span class="m-label">Cena dla klienta</span><span class="m-value">${fmtMoney(o.cenaKlient)}</span></div>
+      <div><span class="m-label">Marża</span><span class="m-value ${margin!==null ? (margin>=0?'margin-pos':'margin-neg') : ''}">${margin!==null ? fmtMoney(margin) : '—'}</span></div>
+      <div><span class="m-label">Nr faktury</span><span class="m-value">${o.faktura ? esc(o.faktura) : '—'}</span></div>
+      ${o.isbnIssn ? `<div><span class="m-label">ISBN/ISSN</span><span class="m-value">${esc(o.isbnIssn)}</span></div>` : ''}
+      ${(o.cenaNettoZam!=='' && o.cenaNettoZam!=null) ? `<div><span class="m-label">Cena netto (zam./fakt.)</span><span class="m-value">${fmtMoney(o.cenaNettoZam)}</span></div>` : ''}
+      ${(o.cenaNettoZam!=='' && o.cenaNettoZam!=null) ? `<div><span class="m-label">VAT / Brutto</span><span class="m-value">${o.vatProcent}% · ${fmtMoney(bruttoZam(o))}</span></div>` : ''}
+      ${o.terminPlatnosciDniKlient ? `<div><span class="m-label">Termin płatności (klient)</span><span class="m-value">${esc(o.terminPlatnosciDniKlient)} dni roboczych</span></div>` : ''}
+      ${o.terminPlatnosciDniDrukarnia ? `<div><span class="m-label">Termin płatności (drukarnia)</span><span class="m-value">${esc(o.terminPlatnosciDniDrukarnia)} dni roboczych</span></div>` : ''}
+    </div>
+
+    <div class="mail-actions">
+      ${o.emailKlienta
+        ? `<a class="mail-btn" href="${esc(mailPotwierdzenieKlient(o))}">✉ Potwierdź zamówienie klientowi</a>`
+        : `<span class="mail-btn disabled" title="Uzupełnij e-mail klienta w edycji zlecenia">✉ Potwierdź zamówienie klientowi</span>`}
+      ${o.emailDrukarni
+        ? `<a class="mail-btn" href="${esc(mailPotwierdzenieDrukarnia(o))}">🖨 Zleć druk drukarni</a>`
+        : `<span class="mail-btn disabled" title="Uzupełnij e-mail drukarni w edycji zlecenia">🖨 Zleć druk drukarni</span>`}
+      ${o.emailKlienta
+        ? `<a class="mail-btn" href="${esc(mailTracking(o))}">📦 Wyślij tracking klientowi</a>`
+        : `<span class="mail-btn disabled" title="Uzupełnij e-mail klienta w edycji zlecenia">📦 Wyślij tracking klientowi</span>`}
+    </div>
+
+    ${o.adresDostawy ? `<div class="card-notes" style="border-top:none;padding-top:0;margin-top:10px;"><span class="m-label">Adres dostawy</span>${esc(o.adresDostawy)}</div>` : ''}
+    ${o.uwagi ? `<div class="card-notes">${esc(o.uwagi)}</div>` : ''}
+  </div>`;
+}
+
+function render(){
+  setTodayLabel();
+  buildReminders();
+
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const sortSel = document.getElementById('sortSel').value;
+  const showClosed = document.getElementById('showClosed').checked;
+
+  let list = orders.filter(o=>{
+    if(!showClosed && o.zamkniete) return false;
+    if(!q) return true;
+    return (o.tytul||'').toLowerCase().includes(q) || (o.klient||'').toLowerCase().includes(q);
+  });
+
+  if(sortSel === 'priority'){
+    list = list.slice().sort((a,b)=> priorityDate(a) < priorityDate(b) ? -1 : 1);
+  } else if(sortSel === 'newest'){
+    list = list.slice().sort((a,b)=> (b.createdAt||0) - (a.createdAt||0));
+  } else if(sortSel === 'client'){
+    list = list.slice().sort((a,b)=> (a.klient||'').localeCompare(b.klient||'', 'pl'));
+  } else if(sortSel === 'title'){
+    list = list.slice().sort((a,b)=> (a.tytul||'').localeCompare(b.tytul||'', 'pl'));
+  }
+
+  document.getElementById('countLabel').textContent = `${list.length} / ${orders.length} zleceń`;
+
+  const listEl = document.getElementById('list');
+  if(list.length === 0){
+    listEl.innerHTML = `<div class="empty">
+      <svg class="regmark" viewBox="0 0 40 40"><circle cx="20" cy="20" r="12" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="20" y1="2" x2="20" y2="38" stroke="currentColor" stroke-width="1.6"/><line x1="2" y1="20" x2="38" y2="20" stroke="currentColor" stroke-width="1.6"/></svg>
+      ${orders.length===0 ? 'Brak zleceń. Dodaj pierwsze, klikając „+ Nowe zlecenie”.' : 'Brak wyników dla podanego wyszukiwania.'}
+    </div>`;
+    return;
+  }
+
+  // grupowanie wg miesiąca daty wysyłki (dostawy)
+  const groups = new Map();
+  list.forEach(o=>{
+    const key = monthKeyOf(o.dataWysylki);
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(o);
+  });
+
+  const keys = Array.from(groups.keys()).sort((a,b)=>{
+    if(a === 'brak-daty') return 1;
+    if(b === 'brak-daty') return -1;
+    return a < b ? -1 : 1;
+  });
+
+  listEl.innerHTML = keys.map(key=>{
+    const groupOrders = groups.get(key);
+    return `
+    <div class="month-group">
+      <div class="month-header">
+        <h2>${monthLabel(key)}</h2>
+        <span class="month-count">${groupOrders.length} ${groupOrders.length===1?'zlecenie':'zleceń'}</span>
+      </div>
+      ${commissionPanelHTML(key, groupOrders)}
+      <div class="list-cards">
+        ${groupOrders.map(renderCard).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openModal(id){
+  editingId = id || null;
+  document.getElementById('orderForm').reset();
+  document.getElementById('deleteBtn').style.display = id ? 'inline-block' : 'none';
+  document.getElementById('duplicateBtn').style.display = id ? 'inline-block' : 'none';
+  document.getElementById('modalTitle').textContent = id ? 'Edytuj zlecenie' : 'Nowe zlecenie';
+
+  if(id){
+    const o = orders.find(x=>x.id===id);
+    document.getElementById('f-id').value = o.id;
+    document.getElementById('f-tytul').value = o.tytul||'';
+    document.getElementById('f-klient').value = o.klient||'';
+    document.getElementById('f-emailKlienta').value = o.emailKlienta||'';
+    document.getElementById('f-parametry').value = o.parametry||'';
+    document.getElementById('f-isbnIssn').value = o.isbnIssn||'';
+    document.getElementById('f-dataPrzekazania').value = o.dataPrzekazania||'';
+    document.getElementById('f-statusPlikow').value = o.statusPlikow||'oczekujące';
+    document.getElementById('f-drukarnia').value = o.drukarnia||'';
+    document.getElementById('f-emailDrukarni').value = o.emailDrukarni||'';
+    document.getElementById('f-dataWysylki').value = o.dataWysylki||'';
+    document.getElementById('f-adresDostawy').value = o.adresDostawy||'';
+    document.getElementById('f-kurier').value = o.kurier||'';
+    document.getElementById('f-listPrzewozowy').value = o.listPrzewozowy||'';
+    document.getElementById('f-cenaDrukarnia').value = o.cenaDrukarnia ?? '';
+    document.getElementById('f-cenaKlient').value = o.cenaKlient ?? '';
+    document.getElementById('f-cenaNettoZam').value = o.cenaNettoZam ?? '';
+    document.getElementById('f-vatProcent').value = (o.vatProcent ?? 23);
+    document.getElementById('f-faktura').value = o.faktura||'';
+    document.getElementById('f-terminPlatnosci').value = o.terminPlatnosci||'';
+    document.getElementById('f-terminPlatnosciDniKlient').value = o.terminPlatnosciDniKlient ?? '';
+    document.getElementById('f-terminPlatnosciDniDrukarnia').value = o.terminPlatnosciDniDrukarnia ?? '';
+    document.getElementById('f-wystawFakture').checked = !!o.wystawFakture;
+    document.getElementById('f-zaplacona').checked = !!o.zaplacona;
+    document.getElementById('f-zamkniete').checked = !!o.zamkniete;
+    document.getElementById('f-uwagi').value = o.uwagi||'';
+  } else {
+    document.getElementById('f-id').value = '';
+  }
+  document.getElementById('overlay').classList.add('open');
+}
+function closeModal(){
+  document.getElementById('overlay').classList.remove('open');
+  editingId = null;
+}
+
+document.getElementById('orderForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  const id = document.getElementById('f-id').value || ('o_'+Date.now());
+  const data = {
+    id,
+    tytul: document.getElementById('f-tytul').value.trim(),
+    klient: document.getElementById('f-klient').value.trim(),
+    emailKlienta: document.getElementById('f-emailKlienta').value.trim(),
+    parametry: document.getElementById('f-parametry').value.trim(),
+    isbnIssn: document.getElementById('f-isbnIssn').value.trim(),
+    dataPrzekazania: document.getElementById('f-dataPrzekazania').value,
+    statusPlikow: document.getElementById('f-statusPlikow').value,
+    drukarnia: document.getElementById('f-drukarnia').value.trim(),
+    emailDrukarni: document.getElementById('f-emailDrukarni').value.trim(),
+    dataWysylki: document.getElementById('f-dataWysylki').value,
+    adresDostawy: document.getElementById('f-adresDostawy').value.trim(),
+    kurier: document.getElementById('f-kurier').value.trim(),
+    listPrzewozowy: document.getElementById('f-listPrzewozowy').value.trim(),
+    cenaDrukarnia: document.getElementById('f-cenaDrukarnia').value,
+    cenaKlient: document.getElementById('f-cenaKlient').value,
+    cenaNettoZam: document.getElementById('f-cenaNettoZam').value,
+    vatProcent: document.getElementById('f-vatProcent').value,
+    faktura: document.getElementById('f-faktura').value.trim(),
+    terminPlatnosci: document.getElementById('f-terminPlatnosci').value,
+    terminPlatnosciDniKlient: document.getElementById('f-terminPlatnosciDniKlient').value,
+    terminPlatnosciDniDrukarnia: document.getElementById('f-terminPlatnosciDniDrukarnia').value,
+    wystawFakture: document.getElementById('f-wystawFakture').checked,
+    zaplacona: document.getElementById('f-zaplacona').checked,
+    zamkniete: document.getElementById('f-zamkniete').checked,
+    uwagi: document.getElementById('f-uwagi').value.trim(),
+    createdAt: Date.now()
+  };
+
+  // jeśli numer faktury został uzupełniony, uznajemy że faktura jest już wystawiona
+  if(data.faktura){
+    data.wystawFakture = false;
+  }
+
+  const idx = orders.findIndex(o=>o.id===id);
+  if(idx>=0){
+    data.createdAt = orders[idx].createdAt;
+    orders[idx] = data;
+  } else {
+    orders.push(data);
+  }
+  save();
+
+  rememberContact(contacts.klienci, data.klient, data.emailKlienta);
+  rememberContact(contacts.drukarnie, data.drukarnia, data.emailDrukarni);
+  saveContacts();
+  renderDatalists();
+
+  closeModal();
+  render();
+});
+
+function duplicateCurrent(){
+  const id = document.getElementById('f-id').value;
+  if(!id) return;
+  const original = orders.find(o=>o.id===id);
+  if(!original) return;
+
+  const copy = Object.assign({}, original);
+  copy.id = 'o_'+Date.now();
+  copy.tytul = original.tytul + ' (kopia)';
+  copy.createdAt = Date.now();
+
+  // czyścimy pola specyficzne dla konkretnej realizacji - uzupełnia się je na nowo
+  copy.dataPrzekazania = '';
+  copy.statusPlikow = 'oczekujące';
+  copy.dataWysylki = '';
+  copy.listPrzewozowy = '';
+  copy.faktura = '';
+  copy.terminPlatnosci = '';
+  copy.wystawFakture = false;
+  copy.zaplacona = false;
+  copy.zamkniete = false;
+
+  orders.push(copy);
+  save();
+  closeModal();
+  render();
+  openModal(copy.id);
+}
+
+function deleteCurrent(){
+  const id = document.getElementById('f-id').value;
+  if(!id) return;
+  if(confirm('Na pewno usunąć to zlecenie? Tej operacji nie można cofnąć.')){
+    orders = orders.filter(o=>o.id!==id);
+    save();
+    closeModal();
+    render();
+  }
+}
+
+document.getElementById('overlay').addEventListener('click', function(e){
+  if(e.target === this) closeModal();
+});
+
+document.getElementById('f-klient').addEventListener('input', function(){
+  autofillEmail(this.value, 'f-emailKlienta', contacts.klienci);
+});
+document.getElementById('f-drukarnia').addEventListener('input', function(){
+  autofillEmail(this.value, 'f-emailDrukarni', contacts.drukarnie);
+});
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(err){
+      console.warn('Nie udało się zarejestrować service workera:', err);
+    });
+  });
+}
+
+</script>
+</body>
+</html>
