@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Zlecenia poligraficzne</title>
+<title>Zlecenia – widok tabeli</title>
 <style>
   :root{
     --paper:#F7F5EF;
@@ -32,7 +32,7 @@
     line-height:1.45;
     min-height:100vh;
   }
-  .wrap{max-width:980px;margin:0 auto;padding:32px 24px 80px;}
+  .wrap{max-width:1500px;margin:0 auto;padding:32px 24px 80px;}
 
   /* --- header --- */
   header{
@@ -271,6 +271,38 @@
   #appRoot.ready{display:block;}
   .logout-btn{background:transparent;border:none;color:var(--ink-soft);font-size:12px;text-decoration:underline;cursor:pointer;}
   .sync-status{font-family:var(--font-mono);font-size:10px;color:var(--ink-soft);}
+
+  /* --- widok tabeli --- */
+  .tbl-wrap{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:4px;}
+  table.orders{border-collapse:collapse;width:100%;min-width:1400px;table-layout:fixed;font-size:13px;}
+  table.orders th{
+    text-align:left;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.6px;
+    color:var(--ink-soft);padding:9px 10px;background:var(--paper-2);border-bottom:1px solid var(--line);
+    position:sticky;top:0;white-space:nowrap;
+  }
+  table.orders th.num, table.orders td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  table.orders td{padding:9px 10px;border-bottom:1px solid var(--paper-2);vertical-align:middle;}
+  table.orders tr.row:hover td{background:#FBFAF6;}
+  table.orders tr.row.closed td{opacity:.55;}
+  table.orders tr.row.closed .t-title{text-decoration:line-through;}
+  .t-title{font-weight:700;font-family:var(--font-display);font-size:14px;}
+  .t-sub{color:var(--ink-soft);font-size:12px;}
+  .pill{display:inline-block;font-size:11px;padding:2px 7px;border-radius:3px;background:var(--paper-2);color:var(--ink-soft);white-space:nowrap;}
+  .pill.status-oczekujące{background:var(--amber-bg);color:#6a4610;}
+  .pill.status-otrzymane{background:#E1EAF2;color:#1f4266;}
+  .pill.status-zaakceptowane{background:var(--green-bg);color:#215432;}
+  .pill.status-wysłane_do_drukarni{background:#E5E0F0;color:#3b2e63;}
+  .pill.overdue{background:var(--red-bg);color:#7a2415;}
+  .pill.soon{background:var(--amber-bg);color:#6a4610;}
+  .pill.paid{background:var(--green-bg);color:#215432;}
+  .t-actions{white-space:nowrap;display:flex;gap:5px;align-items:center;}
+  .t-actions .icon-btn{width:28px;height:28px;font-size:13px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;}
+  .t-actions .icon-btn.disabled{opacity:.3;cursor:not-allowed;}
+  .exp-btn{background:transparent;border:none;color:var(--ink-soft);font-size:11px;width:20px;}
+  tr.detail td{background:#FBFAF6;font-size:12.5px;color:var(--ink-soft);white-space:pre-wrap;padding:12px 14px 14px 40px;}
+  tr.detail b{color:var(--ink);font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.5px;display:block;margin:8px 0 2px;}
+  tr.detail b:first-child{margin-top:0;}
+  .t-check{width:auto;cursor:pointer;}
   .view-switch{font-size:12px;color:var(--navy);text-decoration:underline;}
 </style>
 
@@ -321,7 +353,7 @@
       <button class="btn-primary" onclick="openModal()">+ Nowe zlecenie</button>
       <button class="logout-btn" onclick="document.getElementById('importFile').click()">Importuj dane</button>
       <input type="file" id="importFile" accept="application/json" style="display:none;" onchange="handleImportFile(this.files[0])">
-      <a class="view-switch" href="tabela.html">Widok tabeli</a>
+      <a class="view-switch" href="index.html">Widok kart</a>
       <button class="logout-btn" onclick="doLogout()">Wyloguj</button>
     </div>
   </header>
@@ -1077,6 +1109,101 @@ function renderCard(o){
   </div>`;
 }
 
+
+const expandedRows = new Set();
+function toggleRow(id){
+  if(expandedRows.has(id)) expandedRows.delete(id); else expandedRows.add(id);
+  render();
+}
+
+function orderMargin(o){
+  return (o.cenaKlient!=='' && o.cenaDrukarnia!=='' && o.cenaKlient!=null && o.cenaDrukarnia!=null)
+    ? (Number(o.cenaKlient) - Number(o.cenaDrukarnia)) : null;
+}
+
+function mailIcon(href, icon, title, enabled){
+  return enabled
+    ? `<a class="icon-btn" title="${esc(title)}" href="${esc(href)}">${icon}</a>`
+    : `<span class="icon-btn disabled" title="${esc(title)} (brak e-maila w zleceniu)">${icon}</span>`;
+}
+
+function renderRow(o){
+  const dP = daysDiff(o.dataPrzekazania);
+  const dW = daysDiff(o.dataWysylki);
+  const dT = daysDiff(o.terminPlatnosci);
+
+  let filesExtra = '';
+  if(!filesResolved(o) && dP !== null){
+    if(dP < 0) filesExtra = ' overdue'; else if(dP === 0) filesExtra = ' soon';
+  }
+  let shipExtra = '';
+  if(dW !== null && dW <= 2 && dW >= 0) shipExtra = ' soon';
+  if(dW !== null && dW < 0) shipExtra = ' overdue';
+  let payExtra = o.zaplacona ? ' paid' : '';
+  if(!o.zaplacona && dT !== null){
+    if(dT < 0) payExtra = ' overdue'; else if(dT === 0) payExtra = ' soon';
+  }
+
+  const margin = orderMargin(o);
+  const open = expandedRows.has(o.id);
+  const statusLabel = (o.statusPlikow||'oczekujące').replace(/_/g,' ');
+
+  const tracking = (o.kurier || o.listPrzewozowy)
+    ? `${o.kurier ? esc(o.kurier) : ''}${o.listPrzewozowy ? (isUrl(o.listPrzewozowy)
+        ? ` <a href="${esc(o.listPrzewozowy)}" target="_blank" rel="noopener">śledź</a>`
+        : `<div class="t-sub">${esc(o.listPrzewozowy)}</div>`) : ''}`
+    : '<span class="t-sub">—</span>';
+
+  const detailParts = [];
+  if(o.parametry) detailParts.push(`<b>Parametry druku</b>${esc(o.parametry)}`);
+  if(o.adresDostawy) detailParts.push(`<b>Adres dostawy</b>${esc(o.adresDostawy)}`);
+  if(o.uwagi) detailParts.push(`<b>Uwagi</b>${esc(o.uwagi)}`);
+  if(o.isbnIssn) detailParts.push(`<b>ISBN/ISSN</b>${esc(o.isbnIssn)}`);
+  if(o.terminPlatnosciDniKlient || o.terminPlatnosciDniDrukarnia){
+    detailParts.push(`<b>Terminy płatności (dni robocze)</b>klient: ${o.terminPlatnosciDniKlient ? esc(o.terminPlatnosciDniKlient) : '—'} · drukarnia: ${o.terminPlatnosciDniDrukarnia ? esc(o.terminPlatnosciDniDrukarnia) : '—'}`);
+  }
+  if(o.cenaNettoZam!=='' && o.cenaNettoZam!=null){
+    detailParts.push(`<b>Cena netto (zam./fakt.) / VAT / brutto</b>${fmtMoney(o.cenaNettoZam)} · ${esc(o.vatProcent)}% · ${fmtMoney(bruttoZam(o))}`);
+  }
+  const hasDetail = detailParts.length > 0;
+
+  return `
+  <tr class="row${o.zamkniete ? ' closed' : ''}">
+    <td>${hasDetail ? `<button class="exp-btn" title="Pokaż szczegóły" onclick="toggleRow('${o.id}')">${open ? '▼' : '▶'}</button>` : ''}</td>
+    <td><div class="t-title">${esc(o.tytul)}</div><div class="t-sub">${esc(o.klient)}</div></td>
+    <td>${o.drukarnia ? esc(o.drukarnia) : '<span class="t-sub">—</span>'}</td>
+    <td><span class="pill status-${o.statusPlikow||'oczekujące'}${filesExtra}">${esc(statusLabel)}</span>${o.dataPrzekazania ? `<div class="t-sub">${fmtDate(o.dataPrzekazania)}</div>` : ''}</td>
+    <td><span class="pill${shipExtra}">${fmtDate(o.dataWysylki)}</span></td>
+    <td>${tracking}</td>
+    <td class="num">${fmtMoney(o.cenaDrukarnia)}</td>
+    <td class="num">${fmtMoney(o.cenaKlient)}</td>
+    <td class="num ${margin!==null ? (margin>=0?'margin-pos':'margin-neg') : ''}"><b>${margin!==null ? fmtMoney(margin) : '—'}</b></td>
+    <td>${o.faktura ? esc(o.faktura) : '<span class="t-sub">—</span>'}
+        <label class="t-sub" style="display:block;cursor:pointer;" title="Faktura do wystawienia"><input type="checkbox" class="t-check" ${o.wystawFakture ? 'checked' : ''} onchange="toggleWystawFakture('${o.id}', this.checked)"> wystaw</label></td>
+    <td><span class="pill${payExtra}">${fmtDate(o.terminPlatnosci)}${o.zaplacona ? ' ✓' : ''}</span></td>
+    <td style="text-align:center;"><input type="checkbox" class="t-check" title="Zamknięte" ${o.zamkniete ? 'checked' : ''} onchange="toggleZamkniete('${o.id}', this.checked)"></td>
+    <td><div class="t-actions">
+      <button class="icon-btn" title="Edytuj" onclick="openModal('${o.id}')">✎</button>
+      ${mailIcon(mailPotwierdzenieKlient(o), '✉', 'Potwierdź zamówienie klientowi', !!o.emailKlienta)}
+      ${mailIcon(mailPotwierdzenieDrukarnia(o), '🖨', 'Zleć druk drukarni', !!o.emailDrukarni)}
+      ${mailIcon(mailTracking(o), '📦', 'Wyślij tracking klientowi', !!o.emailKlienta)}
+    </div></td>
+  </tr>
+  ${(hasDetail && open) ? `<tr class="detail"><td colspan="13">${detailParts.join('')}</td></tr>` : ''}`;
+}
+
+function renderTable(groupOrders){
+  return `
+  <div class="tbl-wrap"><table class="orders"><colgroup><col style="width:28px"><col style="width:230px"><col style="width:110px"><col style="width:125px"><col style="width:95px"><col style="width:100px"><col style="width:100px"><col style="width:100px"><col style="width:100px"><col style="width:110px"><col style="width:100px"><col style="width:55px"><col style="width:150px"></colgroup>
+    <thead><tr>
+      <th></th><th>Tytuł / klient</th><th>Drukarnia</th><th>Pliki</th><th>Wysyłka</th><th>Kurier</th>
+      <th class="num">Z drukarni</th><th class="num">Dla klienta</th><th class="num">Marża</th>
+      <th>Faktura</th><th>Płatność</th><th>Zamkn.</th><th>Akcje</th>
+    </tr></thead>
+    <tbody>${groupOrders.map(renderRow).join('')}</tbody>
+  </table></div>`;
+}
+
 function render(){
   setTodayLabel();
   buildReminders();
@@ -1135,9 +1262,7 @@ function render(){
         <span class="month-count">${groupOrders.length} ${groupOrders.length===1?'zlecenie':'zleceń'}</span>
       </div>
       ${commissionPanelHTML(key, groupOrders)}
-      <div class="list-cards">
-        ${groupOrders.map(renderCard).join('')}
-      </div>
+      ${renderTable(groupOrders)}
     </div>`;
   }).join('');
 }
