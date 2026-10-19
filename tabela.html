@@ -143,6 +143,14 @@
   .month-header h2{font-family:var(--font-display);font-size:18px;margin:0;text-transform:none;}
   .month-header .month-count{font-family:var(--font-mono);font-size:12px;color:var(--ink-soft);}
   .month-group .commission{margin-bottom:16px;}
+  .month-stats{background:#fff;border:1px solid var(--line);border-radius:4px;padding:8px 20px;margin-bottom:10px;}
+  .ms-row{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-end;padding:6px 0;}
+  .ms-row + .ms-row{border-top:1px dashed var(--line);}
+  .ms-title{font-family:var(--font-display);font-size:14px;font-weight:700;min-width:210px;flex:1 1 210px;}
+  .ms-title small{display:block;font-family:var(--font-mono);font-size:10.5px;font-weight:400;color:var(--ink-soft);}
+  .ms-stat{min-width:110px;}
+  .ms-stat .m-label{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);display:block;margin-bottom:2px;}
+  .ms-stat .m-value{font-size:16px;font-weight:700;}
   .month-group .list-cards{display:flex;flex-direction:column;gap:14px;}
 
   /* --- cards --- */
@@ -881,6 +889,55 @@ function monthLabel(key){
 }
 function safeKey(key){ return key.replace(/[^a-z0-9]/gi,'_'); }
 
+function numOrNull(v){ return (v===''||v==null||isNaN(Number(v))) ? null : Number(v); }
+function shiftMonth(key, n){
+  const [y,m] = key.split('-').map(Number);
+  const d = new Date(y, m-1+n, 1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function monthAgg(key){
+  const r = {rev:0, margin:0, revM:0, count:0};
+  orders.forEach(o=>{
+    if(monthKeyOf(o.dataWysylki)!==key) return;
+    r.count++;
+    const k = numOrNull(o.cenaKlient), d = numOrNull(o.cenaDrukarnia);
+    if(k!==null) r.rev += k;
+    if(k!==null && d!==null){ r.margin += k-d; r.revM += k; }
+  });
+  return r;
+}
+function fmtPct(a){
+  return a.revM>0 ? (a.margin/a.revM*100).toLocaleString('pl-PL',{minimumFractionDigits:1,maximumFractionDigits:1})+' %' : '—';
+}
+function shortMonth(key){
+  const [y,m] = key.split('-').map(Number);
+  return new Date(y,m-1,1).toLocaleDateString('pl-PL',{month:'short'}).replace('.','');
+}
+function monthStatsHTML(key){
+  if(key==='brak-daty') return '';
+  const cur = monthAgg(key);
+  const ks = [shiftMonth(key,-2), shiftMonth(key,-1), key];
+  const aggs = ks.map(monthAgg);
+  const sum = aggs.reduce((s,a)=>({rev:s.rev+a.rev, margin:s.margin+a.margin, revM:s.revM+a.revM, count:s.count+a.count}), {rev:0,margin:0,revM:0,count:0});
+  const avgCount = (sum.count/3).toLocaleString('pl-PL',{minimumFractionDigits:1,maximumFractionDigits:1});
+  const range = shortMonth(ks[0])+' – '+shortMonth(ks[2])+' '+ks[2].slice(0,4);
+  return `
+  <div class="month-stats">
+    <div class="ms-row">
+      <div class="ms-title">Ten miesiąc<small>wg daty wysyłki</small></div>
+      <div class="ms-stat"><span class="m-label">Obrót netto</span><span class="m-value">${fmtMoney(round2(cur.rev))}</span></div>
+      <div class="ms-stat"><span class="m-label">Średnia marża</span><span class="m-value">${fmtPct(cur)}</span></div>
+      <div class="ms-stat"><span class="m-label">Liczba zamówień</span><span class="m-value">${cur.count}</span></div>
+    </div>
+    <div class="ms-row">
+      <div class="ms-title">Średnia z 3 miesięcy<small>${range}</small></div>
+      <div class="ms-stat"><span class="m-label">Obrót netto / mies.</span><span class="m-value">${fmtMoney(round2(sum.rev/3))}</span></div>
+      <div class="ms-stat"><span class="m-label">Średnia marża</span><span class="m-value">${fmtPct(sum)}</span></div>
+      <div class="ms-stat"><span class="m-label">Zamówień / mies.</span><span class="m-value">${avgCount}</span></div>
+    </div>
+  </div>`;
+}
+
 function commissionPanelHTML(key, groupOrders){
   const sk = safeKey(key);
   const totalMargin = groupOrders.reduce((sum, o)=>{
@@ -1261,6 +1318,7 @@ function render(){
         <h2>${monthLabel(key)}</h2>
         <span class="month-count">${groupOrders.length} ${groupOrders.length===1?'zlecenie':'zleceń'}</span>
       </div>
+      ${monthStatsHTML(key)}
       ${commissionPanelHTML(key, groupOrders)}
       ${renderTable(groupOrders)}
     </div>`;
