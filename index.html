@@ -151,6 +151,11 @@
   .ms-stat{min-width:110px;}
   .ms-stat .m-label{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);display:block;margin-bottom:2px;}
   .ms-stat .m-value{font-size:16px;font-weight:700;}
+  .commission.minimized{padding:8px 20px;margin-bottom:16px;}
+  .commission-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;}
+  .commission-bar h3{font-family:var(--font-display);font-size:14px;margin:0;color:var(--ink-soft);}
+  .comm-min-btn{background:none;border:1px solid var(--line);border-radius:4px;padding:3px 10px;font-size:11px;color:var(--ink-soft);cursor:pointer;font-family:var(--font-mono);}
+  .comm-min-btn:hover{background:var(--paper-2);}
   .month-group .list-cards{display:flex;flex-direction:column;gap:14px;}
 
   /* --- cards --- */
@@ -464,6 +469,29 @@
         <div></div>
 
         <div class="full check-row">
+          <input type="checkbox" id="f-przedplata" onchange="togglePrepayFields()">
+          <label for="f-przedplata">Klient płaci z góry całość (przedpłata na podstawie faktury proforma)</label>
+        </div>
+        <div class="full" id="prepayFields" style="display:none;">
+          <div class="form-grid">
+            <div>
+              <label>Nr faktury proforma</label>
+              <input type="text" id="f-numerProformy" placeholder="np. PRO/2026/11/3">
+            </div>
+            <div>
+              <label>Data wpłaty przedpłaty</label>
+              <input type="date" id="f-dataPrzedplaty">
+            </div>
+            <div>
+              <label>Nr faktury zaliczkowej</label>
+              <input type="text" id="f-fakturaZaliczkowa" placeholder="uzupełnij po wystawieniu">
+            </div>
+            <div></div>
+          </div>
+          <div style="font-size:11px;color:var(--ink-soft);margin-top:6px;line-height:1.5;">Jeśli wpłata przypada w innym miesiącu niż wysyłka, pod koniec miesiąca wpłaty pojawi się przypomnienie o fakturze zaliczkowej (znika po wpisaniu jej numeru). Faktura końcowa jest wystawiana w miesiącu wysyłki.</div>
+        </div>
+
+        <div class="full check-row">
           <input type="checkbox" id="f-wystawFakture">
           <label for="f-wystawFakture">Wystaw fakturę (jeszcze nie wystawiona)</label>
         </div>
@@ -759,9 +787,24 @@ function buildReminders(){
     if(!invoiceReminderAdded && !o.faktura && o.dataWysylki && dW !== null && dW <= 0){
       items.push({id:`invoice-${o.id}`, level:'amber', tag:'Ważne', text:`Zamówienie zostało wysłane do klienta (${fmtDate(o.dataWysylki)}) — czas wystawić fakturę — <b>${esc(o.tytul)}</b> (${esc(o.klient)})`});
     }
+    // przedpłata: faktura zaliczkowa pod koniec miesiąca wpłaty, gdy realizacja jest w kolejnym miesiącu
+    if(o.przedplata && o.dataPrzedplaty && !o.fakturaZaliczkowa){
+      const payM = o.dataPrzedplaty.slice(0,7);
+      const shipM = o.dataWysylki ? o.dataWysylki.slice(0,7) : '';
+      if(shipM === '' || shipM > payM){
+        const lastDay = lastDayISO(payM);
+        const dE = daysDiff(lastDay);
+        const opis = `<b>${esc(o.tytul)}</b> (${esc(o.klient)})${o.numerProformy ? ', proforma '+esc(o.numerProformy) : ''}${shipM ? ', realizacja: '+monthLabel(shipM).toLowerCase() : ''}`;
+        if(dE !== null && dE < 0){
+          items.push({id:`advance-${o.id}`, level:'red', tag:'Ważne', text:`Zaległość: nie wystawiono faktury zaliczkowej do przedpłaty (miesiąc wpłaty minął) — ${opis}`});
+        } else if(dE !== null && dE <= 3){
+          items.push({id:`advance-${o.id}`, level:'amber', tag: dE===0 ? 'Dziś' : `Za ${dE} dni`, text:`Koniec miesiąca (${fmtDate(lastDay)}) — wystaw fakturę zaliczkową do przedpłaty — ${opis}`});
+        }
+      }
+    }
     // termin płatności
     const dT = daysDiff(o.terminPlatnosci);
-    if(o.terminPlatnosci && !o.zaplacona){
+    if(o.terminPlatnosci && !o.zaplacona && !isPrepaid(o)){
       if(dT === 0){
         items.push({id:`payment-${o.id}`, level:'red', tag:'Ważne', text:`Dziś mija termin płatności faktury ${o.faktura ? esc(o.faktura) : ''} — <b>${esc(o.klient)}</b> (${esc(o.tytul)})`});
       } else if(dT !== null && dT < 0){
@@ -835,6 +878,13 @@ function calcWynagrodzenie(brutto){
 }
 
 const openPanels = new Set();
+let commissionMin = false;
+try{ commissionMin = localStorage.getItem('zlecenia_comm_min_v1')==='1'; }catch(e){}
+function toggleCommissionMin(){
+  commissionMin = !commissionMin;
+  try{ localStorage.setItem('zlecenia_comm_min_v1', commissionMin?'1':'0'); }catch(e){}
+  render();
+}
 
 function toggleCommission(key){
   const body = document.getElementById('commissionBody-'+key);
@@ -857,6 +907,22 @@ function monthLabel(key){
 }
 function safeKey(key){ return key.replace(/[^a-z0-9]/gi,'_'); }
 
+function isPrepaid(o){ return !!(o.przedplata && o.dataPrzedplaty); }
+function lastDayISO(ym){
+  const [y,m] = ym.split('-').map(Number);
+  return ym+'-'+String(new Date(y, m, 0).getDate()).padStart(2,'0');
+}
+function togglePrepayFields(){
+  const on = document.getElementById('f-przedplata').checked;
+  document.getElementById('prepayFields').style.display = on ? 'block' : 'none';
+}
+function prepayText(o){
+  if(!o.przedplata) return '';
+  return 'Przedpłata'
+    + (o.numerProformy ? ' · proforma '+o.numerProformy : '')
+    + (o.dataPrzedplaty ? ' · wpłata '+fmtDate(o.dataPrzedplaty) : ' · czeka na wpłatę')
+    + (o.fakturaZaliczkowa ? ' · FZ '+o.fakturaZaliczkowa : '');
+}
 function numOrNull(v){ return (v===''||v==null||isNaN(Number(v))) ? null : Number(v); }
 function shiftMonth(key, n){
   const [y,m] = key.split('-').map(Number);
@@ -908,6 +974,9 @@ function monthStatsHTML(key){
 
 function commissionPanelHTML(key, groupOrders){
   const sk = safeKey(key);
+  if(commissionMin){
+    return `<div class="commission minimized"><div class="commission-bar"><h3>Prowizja od marży</h3><button type="button" class="comm-min-btn" onclick="toggleCommissionMin()" title="Pokaż prowizję">Rozwiń ▾</button></div></div>`;
+  }
   const totalMargin = groupOrders.reduce((sum, o)=>{
     if(o.cenaKlient!=='' && o.cenaDrukarnia!=='' && o.cenaKlient!=null && o.cenaDrukarnia!=null){
       return sum + (Number(o.cenaKlient) - Number(o.cenaDrukarnia));
@@ -929,7 +998,7 @@ function commissionPanelHTML(key, groupOrders){
           <div class="stat"><span class="m-label">Do wypłaty — netto</span><span class="m-value">${fmtMoney(w.netto)}</span></div>
         </div>
       </div>
-      <span class="caret${isOpen?' open':''}" id="commissionCaret-${sk}">▶</span>
+      <span style="display:flex;gap:12px;align-items:center;"><button type="button" class="comm-min-btn" onclick="event.stopPropagation();toggleCommissionMin()" title="Zwiń i ukryj kwoty prowizji">Zwiń ▴</button><span class="caret${isOpen?' open':''}" id="commissionCaret-${sk}">▶</span></span>
     </div>
     <div class="commission-body${isOpen?' open':''}" id="commissionBody-${sk}">
       <div class="commission-row"><span class="lbl">Kwota brutto (prowizja)</span><span>${fmtMoney(w.brutto)}</span></div>
@@ -1066,8 +1135,8 @@ function renderCard(o){
   if(dW !== null && dW <= 2 && dW >= 0) shipExtra = ' soon';
   if(dW !== null && dW < 0) shipExtra = ' overdue';
 
-  let payClass = o.zaplacona ? ' paid' : '';
-  if(!o.zaplacona && dT !== null){
+  let payClass = (o.zaplacona||isPrepaid(o)) ? ' paid' : '';
+  if(!o.zaplacona && !isPrepaid(o) && dT !== null){
     if(dT < 0) payClass = ' overdue';
     else if(dT === 0) payClass = ' soon';
   }
@@ -1098,7 +1167,8 @@ function renderCard(o){
       <span class="badge ${filesClass}${filesExtra}">📄 Pliki: <b>${o.statusPlikow||'oczekujące'}</b>${o.dataPrzekazania ? ' · '+fmtDate(o.dataPrzekazania):''}</span>
       <span class="badge${shipExtra}">🚚 ${o.drukarnia ? esc(o.drukarnia)+' · ' : ''}Wysyłka: <b>${fmtDate(o.dataWysylki)}</b></span>
       ${(o.kurier || o.listPrzewozowy) ? `<span class="badge">📦 ${o.kurier ? esc(o.kurier)+' · ' : ''}${o.listPrzewozowy ? (isUrl(o.listPrzewozowy) ? `<a href="${esc(o.listPrzewozowy)}" target="_blank" rel="noopener" style="color:inherit;">Śledź przesyłkę</a>` : `<b>${esc(o.listPrzewozowy)}</b>`) : 'brak nr listu'}</span>` : ''}
-      <span class="badge${payClass}">🧾 Płatność: <b>${fmtDate(o.terminPlatnosci)}</b>${o.zaplacona?' · opłacona':''}</span>
+      <span class="badge${payClass}">🧾 Płatność: <b>${fmtDate(o.terminPlatnosci)}</b>${o.zaplacona?' · opłacona':(isPrepaid(o)?' · przedpłata':'')}</span>
+      ${o.przedplata ? `<span class="badge${o.dataPrzedplaty?' paid':' soon'}">💰 ${esc(prepayText(o))}</span>` : ''}
       <label class="quick-check${o.wystawFakture ? ' active' : ''}" onclick="event.stopPropagation();">
         <input type="checkbox" ${o.wystawFakture ? 'checked' : ''} onchange="toggleWystawFakture('${o.id}', this.checked)">
         Wystaw fakturę
@@ -1234,10 +1304,15 @@ function openModal(id){
     document.getElementById('f-wystawFakture').checked = !!o.wystawFakture;
     document.getElementById('f-zaplacona').checked = !!o.zaplacona;
     document.getElementById('f-zamkniete').checked = !!o.zamkniete;
+    document.getElementById('f-przedplata').checked = !!o.przedplata;
+    document.getElementById('f-numerProformy').value = o.numerProformy||'';
+    document.getElementById('f-dataPrzedplaty').value = o.dataPrzedplaty||'';
+    document.getElementById('f-fakturaZaliczkowa').value = o.fakturaZaliczkowa||'';
     document.getElementById('f-uwagi').value = o.uwagi||'';
   } else {
     document.getElementById('f-id').value = '';
   }
+  togglePrepayFields();
   document.getElementById('overlay').classList.add('open');
 }
 function closeModal(){
@@ -1274,6 +1349,10 @@ document.getElementById('orderForm').addEventListener('submit', function(e){
     wystawFakture: document.getElementById('f-wystawFakture').checked,
     zaplacona: document.getElementById('f-zaplacona').checked,
     zamkniete: document.getElementById('f-zamkniete').checked,
+    przedplata: document.getElementById('f-przedplata').checked,
+    numerProformy: document.getElementById('f-numerProformy').value.trim(),
+    dataPrzedplaty: document.getElementById('f-dataPrzedplaty').value,
+    fakturaZaliczkowa: document.getElementById('f-fakturaZaliczkowa').value.trim(),
     uwagi: document.getElementById('f-uwagi').value.trim(),
     createdAt: Date.now()
   };
@@ -1322,6 +1401,9 @@ function duplicateCurrent(){
   copy.wystawFakture = false;
   copy.zaplacona = false;
   copy.zamkniete = false;
+  copy.numerProformy = '';
+  copy.dataPrzedplaty = '';
+  copy.fakturaZaliczkowa = '';
 
   orders.push(copy);
   save();
