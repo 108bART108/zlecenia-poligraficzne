@@ -15,8 +15,16 @@ Zmienne środowiskowe (sekrety GitHub):
   FIREBASE_SA   — cała zawartość pliku klucza konta usługi Firebase (JSON)
   NTFY_TOPIC    — nazwa tematu w aplikacji ntfy
   DHL_API_KEY   — opcjonalnie, darmowy klucz z developer.dhl.com
+  GLS_API_KEY   — opcjonalnie, darmowy klucz Track&Trace GLS
+  SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM — wysyłka maili do klientów
+  FIREBASE_SA_PANEL — klucz konta usługi Panelu wycen (numer listu wpisany przez drukarnię)
+
+Maile do klientów: tylko etap, tytuł zlecenia i nazwa kuriera — bez numeru listu i linku,
+żeby klient nie zobaczył na stronie kuriera, skąd (z której drukarni) nadano paczkę.
 """
-import os, re, sys, json, datetime
+import os, re, sys, json, ssl, smtplib, datetime
+from email.message import EmailMessage
+from email.utils import formataddr
 from urllib.parse import urlparse, parse_qs
 import requests
 
@@ -145,21 +153,37 @@ def dpd(nr):
     return etap, "DPD: status ze strony śledzenia" if etap else "DPD: nie odczytano statusu"
 
 
+GLS_MAPA = {"DELIVERED": "DORECZONA", "DELIVEREDPS": "DORECZONA", "INDELIVERY": "W_DORECZENIU",
+            "INTRANSIT": "ODEBRANA", "INWAREHOUSE": "ODEBRANA", "NOTDELIVERED": "PROBLEM"}
+
+
 def gls(nr):
-    """GLS Polska — publiczne zapytanie strony śledzenia (tryb eksperymentalny)."""
-    r = requests.get("https://gls-group.com/app/service/open/rest/PL/pl/rstt001",
-                     params={"match": nr}, headers=UA, timeout=25)
-    r.raise_for_status()
-    dane = r.json()
+    """GLS — Track&Trace. Od 2025/26 GLS wymaga klucza API (sekret GLS_API_KEY)."""
+    klucz = os.environ.get("GLS_API_KEY")
+    if klucz:
+        r = requests.get("https://api-tt.de.gls-group.com/app/service/open/rest/PL/pl/rstt001",
+                         params={"match": nr}, headers={**UA, "x-api-key": klucz, "Accept": "application/json"}, timeout=25)
+    else:
+        r = requests.get("https://gls-group.com/app/service/open/rest/PL/pl/rstt001",
+                         params={"match": nr}, headers={**UA, "Accept": "application/json"}, timeout=25)
+    if r.status_code in (401, 403):
+        return None, "GLS: klucz API nieprawidłowy lub nieaktywny"
+    if r.status_code == 404:
+        return None, "numer jeszcze nieznany w GLS"
     try:
-        info = dane["tuStatus"][0]["progressBar"]["statusInfo"]
-    except Exception:
-        info = ""
-    mapa = {"DELIVERED": "DORECZONA", "INDELIVERY": "W_DORECZENIU", "INTRANSIT": "ODEBRANA",
-            "INWAREHOUSE": "ODEBRANA", "DELIVEREDPS": "DORECZONA", "NOTDELIVERED": "PROBLEM"}
-    if info.upper() in mapa:
-        return mapa[info.upper()], info
-    return klasyfikuj_tekst(json.dumps(dane, ensure_ascii=False)), info or "GLS"
+        dane = r.json()
+    except ValueError:
+        return None, "GLS: potrzebny klucz API (sekret GLS_API_KEY)" if not klucz else "GLS: nieczytelna odpowiedź"
+    tu = (dane.get("tuStatus") or [{}])[0]
+    info = ((tu.get("progressBar") or {}).get("statusInfo") or "").upper()
+    hist = tu.get("history") or []
+    opis = (hist[0].get("evtDscr") if hist and isinstance(hist[0], dict) else "") or info or "GLS"
+    if info in GLS_MAPA:
+        etap = GLS_MAPA[info]
+        if etap != "DORECZONA" and klasyfikuj_tekst(opis) == "W_DORECZENIU":
+            etap = "W_DORECZENIU"
+        return etap, opis
+    return klasyfikuj_tekst(opis), opis
 
 
 PRZEWOZNICY = {"inpost": inpost, "dhl": dhl, "dpd": dpd, "gls": gls}
@@ -230,7 +254,12 @@ def przetworz(orders, sledzenie, sprawdz=None):
             nowy, opis = sprawdz(przew, nr)
         except Exception as e:
             print(f"  ! {o['id']} [{przew}]: błąd zapytania ({type(e).__name__})")
+            w["status"] = f"błąd odczytu u przewoźnika ({type(e).__name__})"
+            w["blad"] = True
+            w["sprawdzono"] = teraz()
+            zmiany += 1
             continue
+        w["blad"] = nowy is None and str(opis).startswith(("GLS:", "DHL:", "DPD: nie"))
         zdarzenie = aktualizuj(w, nowy, opis)
         zmiany += 1
         print(f"  {o['id']} [{przew}]: {w.get('etap') or 'oczekuje'}")
@@ -239,7 +268,112 @@ def przetworz(orders, sledzenie, sprawdz=None):
             tresc = (f"{o.get('klient') or ''}\n{przew.upper()} {nr}\nStatus przewoźnika: {opis}").strip()
             link = wpis_txt if wpis_txt.lower().startswith("http") else ""
             powiadom(tytul, tresc, link)
+            if zdarzenie in ETAPY and o.get("mailKlientWysylka") and (o.get("emailKlienta") or "").strip():
+                if zdarzenie not in w.get("maile", []):
+                    if mail_do_klienta(o, przew, zdarzenie, opis):
+                        w.setdefault("maile", []).append(zdarzenie)
     return zmiany
+
+# ------------------------------------------------------------ maile do klientów
+
+NAZWY_KURIEROW = {"inpost": "InPost", "dhl": "DHL", "dpd": "DPD", "gls": "GLS"}
+PODPIS = ("Pozdrawiam serdecznie\nBartosz Zając\nIB Projekt Printing\n"
+          "tel. 792 331 442 · bz@ibprojekt.eu")
+
+
+def tresc_maila(o, przew, etap, status):
+    t = (o.get("tytul") or "zamówienie").strip()
+    k = NAZWY_KURIEROW.get(przew, przew.upper())
+    if etap == "ODEBRANA":
+        temat = f"„{t}” — przesyłka jest w drodze"
+        txt = f"Dzień dobry,\n\nuprzejmie informuję, że Państwa zamówienie „{t}” zostało przekazane firmie kurierskiej {k} i jest w drodze."
+    elif etap == "W_DORECZENIU" and status == "ready_to_pickup":
+        temat = f"„{t}” — przesyłka czeka na odbiór"
+        txt = f"Dzień dobry,\n\nzamówienie „{t}” czeka na odbiór w wybranym punkcie {k}. Kod odbioru przyjdzie od {k} SMS-em lub e-mailem."
+    elif etap == "W_DORECZENIU":
+        temat = f"„{t}” — kurier jest w drodze do Państwa"
+        txt = f"Dzień dobry,\n\nprzesyłka z zamówieniem „{t}” została wydana kurierowi {k} do doręczenia. Dostawa spodziewana jest dziś."
+    else:
+        temat = f"„{t}” — przesyłka doręczona"
+        txt = (f"Dzień dobry,\n\nwedług informacji {k} przesyłka z zamówieniem „{t}” została doręczona.\n"
+               "Jeśli coś się nie zgadza albo paczka nie dotarła w komplecie, proszę o wiadomość — zajmę się tym od razu.")
+    return temat, txt + "\n\n" + PODPIS
+
+
+def mail_do_klienta(o, przew, etap, status):
+    host = os.environ.get("SMTP_HOST")
+    if not host:
+        print("  · mail do klienta pominięty: brak SMTP_HOST")
+        return False
+    port = int(os.environ.get("SMTP_PORT") or 465)
+    user, haslo = os.environ.get("SMTP_USER", ""), os.environ.get("SMTP_PASS", "")
+    nadawca = os.environ.get("MAIL_FROM") or user
+    temat, tresc = tresc_maila(o, przew, etap, status)
+    m = EmailMessage()
+    m["Subject"] = temat
+    m["From"] = formataddr(("IB Projekt Printing", nadawca))
+    m["To"] = ", ".join(a.strip() for a in re.split(r"[;,]", o["emailKlienta"]) if a.strip())
+    m["Reply-To"] = nadawca
+    m.set_content(tresc)
+    try:
+        if port == 465:
+            with smtplib.SMTP_SSL(host, port, context=ssl.create_default_context(), timeout=30) as s:
+                s.login(user, haslo); s.send_message(m)
+        else:
+            with smtplib.SMTP(host, port, timeout=30) as s:
+                s.starttls(context=ssl.create_default_context()); s.login(user, haslo); s.send_message(m)
+        print("  ✉ wysłano mail do klienta")
+        return True
+    except Exception as e:
+        print(f"  ! mail do klienta: {type(e).__name__}")
+        return False
+
+# ------------------------------------------------------------ Panel wycen (drukarnie)
+
+def synchronizuj_panel(db, panel, uid_ref):
+    """1) Wysyła do panelu listę otwartych zleceń (do wyboru przy przekazaniu zlecenia drukarni).
+       2) Numer listu wpisany przez drukarnię przepisuje do odpowiedniego zlecenia w tabeli."""
+    from google.cloud import firestore as gfs
+    state_ref = uid_ref.collection("app").document("state")
+    orders = (state_ref.get().to_dict() or {}).get("orders", [])
+    lista = [{"id": o["id"], "tytul": o.get("tytul", ""), "klient": o.get("klient", "")}
+             for o in orders if not o.get("zamkniete")]
+    panel.collection("prywatne").document("_tabela").set({"lista": lista, "aktualizacja": teraz()})
+    for z in panel.collection("zapytania").stream():
+        zd = z.to_dict() or {}
+        wyk = zd.get("wykonawca")
+        if not wyk:
+            continue
+        ws = panel.collection("zapytania").document(z.id).collection("wysylka").document(wyk).get()
+        if not ws.exists:
+            continue
+        wd = ws.to_dict() or {}
+        kurier, numer = (wd.get("kurier") or "").strip(), (wd.get("numer") or "").strip()
+        pryw_ref = panel.collection("prywatne").document(z.id)
+        pryw = pryw_ref.get().to_dict() or {}
+        zid = pryw.get("zlecenieTabela")
+        if not (zid and numer) or pryw.get("wysylkaPrzepisana") == f"{kurier}|{numer}|{zid}":
+            continue
+
+        @gfs.transactional
+        def wpisz(tr):
+            snap = state_ref.get(transaction=tr)
+            lst = (snap.to_dict() or {}).get("orders", [])
+            for o in lst:
+                if o.get("id") == zid:
+                    o["kurier"], o["listPrzewozowy"] = kurier, numer
+                    tr.set(state_ref, {"orders": lst}, merge=True)
+                    return o
+            return None
+
+        o = wpisz(db.transaction())
+        if o is None:
+            print(f"  ! panel {z.id}: nie znaleziono zlecenia {zid} w tabeli")
+            continue
+        pryw_ref.set({"wysylkaPrzepisana": f"{kurier}|{numer}|{zid}"}, merge=True)
+        print(f"  panel {z.id}: przepisano numer listu do zlecenia {zid}")
+        powiadom(f"🏭 Drukarnia podała numer listu — {o.get('tytul') or 'zlecenie'}",
+                 f"{kurier} {numer}\nWpisane do tabeli zleceń — śledzenie rusza automatycznie.")
 
 # ------------------------------------------------------------ Firestore
 
@@ -254,7 +388,16 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "test":
         powiadom("Test — IB Projekt Printing", "Bot śledzenia przesyłek działa w chmurze.")
         return
+    panel = None
+    if os.environ.get("FIREBASE_SA_PANEL"):
+        papp = firebase_admin.initialize_app(credentials.Certificate(json.loads(os.environ["FIREBASE_SA_PANEL"])), name="panel")
+        panel = firestore.client(app=papp)
     for u in db.collection("users").list_documents():
+        if panel is not None and u.collection("app").document("state").get().exists:
+            try:
+                synchronizuj_panel(db, panel, u)
+            except Exception as e:
+                print(f"  ! panel: {type(e).__name__}: {str(e)[:120]}")
         state = u.collection("app").document("state").get()
         if not state.exists:
             continue
