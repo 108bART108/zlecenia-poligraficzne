@@ -1,0 +1,28 @@
+name: Śledzenie przesyłek
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      tryb:
+        description: "Wpisz 'test', aby wysłać próbne powiadomienie"
+        required: false
+        default: ""
+
+jobs:
+  sledz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install firebase-admin requests
+      - run: python bot/sledzenie_chmura.py "$TRYB"
+        env:
+          TRYB: ${{ github.event.inputs.tryb }}
+          FIREBASE_SA: ${{ secrets.FIREBASE_SA }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          DHL_API_KEY: ${{ secrets.DHL_API_KEY }}
