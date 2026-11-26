@@ -457,7 +457,7 @@
 
         <div>
           <label>Firma kurierska</label>
-          <input type="text" id="f-kurier" placeholder="np. DPD, InPost, DHL">
+          <input type="text" id="f-kurier" placeholder="InPost, DHL, DPD, GLS — śledzone automatycznie">
         </div>
         <div>
           <label>Nr listu przewozowego / link do śledzenia</label>
@@ -584,6 +584,8 @@ db.enablePersistence({synchronizeTabs:true}).catch(()=>{ /* offline cache niedos
 let currentUser = null;
 let stateDocRef = null;
 let unsubscribeSnapshot = null;
+let sledzenie = {};          // stan przesyłek zapisywany przez bota (users/{uid}/app/sledzenie)
+let unsubscribeSledzenie = null;
 
 function setSyncStatus(text){
   const el = document.getElementById('syncStatus');
@@ -602,11 +604,16 @@ function showLogin(msg){
 
 auth.onAuthStateChanged(function(user){
   if(unsubscribeSnapshot){ unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+  if(unsubscribeSledzenie){ unsubscribeSledzenie(); unsubscribeSledzenie = null; }
   if(user){
     currentUser = user;
     stateDocRef = db.collection('users').doc(user.uid).collection('app').doc('state');
     showApp();
     setSyncStatus('Synchronizowanie…');
+    unsubscribeSledzenie = db.collection('users').doc(user.uid).collection('app').doc('sledzenie').onSnapshot(function(s){
+      sledzenie = ((s.data() || {}).przesylki) || {};
+      render();
+    }, function(err){ console.warn('Śledzenie przesyłek:', err); });
     unsubscribeSnapshot = stateDocRef.onSnapshot(function(snap){
       const data = snap.data() || {};
       orders = data.orders || [];
@@ -871,6 +878,14 @@ function buildReminders(){
 function esc(s){
   if(s===undefined||s===null) return '';
   return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function trackBadge(o){
+  const w = sledzenie[o.id];
+  if(!o.listPrzewozowy || !w) return '';
+  const E = { ODEBRANA:['📦','odebrana'], W_DORECZENIU:['🚚','w doręczeniu'], DORECZONA:['✅','doręczona'] };
+  const e = w.problem ? ['⚠️','problem'] : (E[w.etap] || ['⏳','czeka na nadanie']);
+  const tip = (w.status ? 'Status przewoźnika: ' + w.status : '') + (w.sprawdzono ? ' · sprawdzono ' + w.sprawdzono : '');
+  return `<span class="badge" title="${esc(tip)}">${e[0]} <b>${e[1]}</b></span>`;
 }
 function isUrl(s){
   return /^https?:\/\//i.test((s||'').trim());
@@ -1199,6 +1214,7 @@ function renderCard(o){
       <span class="badge ${filesClass}${filesExtra}">📄 Pliki: <b>${o.statusPlikow||'oczekujące'}</b>${o.dataPrzekazania ? ' · '+fmtDate(o.dataPrzekazania):''}</span>
       <span class="badge${shipExtra}">🚚 ${o.drukarnia ? esc(o.drukarnia)+' · ' : ''}Wysyłka: <b>${fmtDate(o.dataWysylki)}</b></span>
       ${(o.kurier || o.listPrzewozowy) ? `<span class="badge">📦 ${o.kurier ? esc(o.kurier)+' · ' : ''}${o.listPrzewozowy ? (isUrl(o.listPrzewozowy) ? `<a href="${esc(o.listPrzewozowy)}" target="_blank" rel="noopener" style="color:inherit;">Śledź przesyłkę</a>` : `<b>${esc(o.listPrzewozowy)}</b>`) : 'brak nr listu'}</span>` : ''}
+      ${trackBadge(o)}
       <span class="badge${payClass}">🧾 Płatność: <b>${fmtDate(o.terminPlatnosci)}</b>${o.zaplacona?' · opłacona':''}</span>
       <label class="quick-check${o.wystawFakture ? ' active' : ''}" onclick="event.stopPropagation();">
         <input type="checkbox" ${o.wystawFakture ? 'checked' : ''} onchange="toggleWystawFakture('${o.id}', this.checked)">
@@ -1277,7 +1293,7 @@ function renderRow(o){
   const tracking = (o.kurier || o.listPrzewozowy)
     ? `${o.kurier ? esc(o.kurier) : ''}${o.listPrzewozowy ? (isUrl(o.listPrzewozowy)
         ? ` <a href="${esc(o.listPrzewozowy)}" target="_blank" rel="noopener">śledź</a>`
-        : `<div class="t-sub">${esc(o.listPrzewozowy)}</div>`) : ''}`
+        : `<div class="t-sub">${esc(o.listPrzewozowy)}</div>`) : ''}${trackBadge(o) ? '<div>' + trackBadge(o) + '</div>' : ''}`
     : '<span class="t-sub">—</span>';
 
   const detailParts = [];
